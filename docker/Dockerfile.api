@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1
+# AutoTranslateAI API image: ASP.NET host only (no media CLI tools — those live in the Worker).
+# Build context is the solution root (AutoTranslateAI/).
+
+# ---------- Build stage (.NET publish) ----------
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+# Copy only the csproj files the API needs, then restore — keeps the restore layer cached.
+COPY src/Api/Api.csproj                   src/Api/
+COPY src/Application/Application.csproj    src/Application/
+COPY src/Infrastructure/Infrastructure.csproj src/Infrastructure/
+COPY src/Domain/Domain.csproj             src/Domain/
+COPY src/Shared/Shared.csproj             src/Shared/
+RUN dotnet restore src/Api/Api.csproj
+
+# Copy the rest of the source and publish.
+COPY src/ src/
+RUN dotnet publish src/Api/Api.csproj -c Release -o /app/publish /p:UseAppHost=false
+
+# ---------- Runtime stage ----------
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+WORKDIR /app
+
+# curl is used by the container HEALTHCHECK below.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
+
+# Kestrel listens on 8080 (the .NET 8+ default for the aspnet image); HTTP only inside the network.
+ENV ASPNETCORE_HTTP_PORTS=8080
+EXPOSE 8080
+
+COPY --from=build /app/publish ./
+
+# Liveness probe — the /health endpoint returns 200 once the host is up (DB-independent).
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
+  CMD curl -fsS http://localhost:8080/health || exit 1
+
+ENTRYPOINT ["dotnet", "Api.dll"]

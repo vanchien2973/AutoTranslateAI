@@ -1,0 +1,59 @@
+# syntax=docker/dockerfile:1
+# AutoTranslateAI Worker image: .NET worker host + the media CLI tools the pipeline shells out to
+# (ffmpeg, yt-dlp, demucs) plus a Python env. Build context is the solution root (AutoTranslateAI/).
+
+# ---------- Build stage (.NET publish) ----------
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+# Copy only the csproj files Workers needs, then restore — keeps the restore layer cached.
+COPY src/Workers/Workers.csproj          src/Workers/
+COPY src/Application/Application.csproj   src/Application/
+COPY src/Infrastructure/Infrastructure.csproj src/Infrastructure/
+COPY src/Domain/Domain.csproj            src/Domain/
+COPY src/Shared/Shared.csproj            src/Shared/
+RUN dotnet restore src/Workers/Workers.csproj
+
+# Copy the rest of the source and publish.
+COPY src/ src/
+RUN dotnet publish src/Workers/Workers.csproj -c Release -o /app/publish /p:UseAppHost=false
+
+# ---------- Runtime stage (.NET + media tools) ----------
+FROM mcr.microsoft.com/dotnet/runtime:9.0 AS runtime
+WORKDIR /app
+
+# ffmpeg + Python (Debian 12 base). --no-install-recommends keeps the image lean.
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        python3 \
+        python3-pip \
+        python3-venv \
+        ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# Python tools live in an isolated venv (Debian bookworm is PEP-668 "externally managed").
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3 -m venv "$VIRTUAL_ENV"
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Install CPU-only PyTorch from the cpu wheel index FIRST so demucs does not drag in the
+# multi-gigabyte CUDA build, then demucs and yt-dlp.
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu \
+ && pip install --no-cache-dir "demucs==4.0.1" yt-dlp
+
+# Where the demucs / whisper model weights are cached (mount a volume here to persist them).
+ENV TORCH_HOME=/models/torch \
+    XDG_CACHE_HOME=/models/cache
+
+# App + verify helper.
+COPY --from=build /app/publish ./
+COPY docker/verify-tools.sh /usr/local/bin/verify-tools
+RUN chmod +x /usr/local/bin/verify-tools
+
+# Fail fast at build time if any tool is missing or unrunnable.
+RUN /usr/local/bin/verify-tools
+
+ENTRYPOINT ["dotnet", "Workers.dll"]

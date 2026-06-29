@@ -1,0 +1,97 @@
+# Local stack for AutoTranslateAI (Phase 0): PostgreSQL + RabbitMQ + API + media Worker.
+# Usage:        cp .env.example .env  &&  docker compose up -d --build
+# API health:   curl http://localhost:8080/health
+# Verify tools: docker compose run --rm --entrypoint verify-tools worker
+name: autotranslateai
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ata-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ata}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ata_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-autotranslateai}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ata} -d ${POSTGRES_DB:-autotranslateai}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - ata-net
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ata-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-ata}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-ata_dev_password}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"        # AMQP
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"  # Management UI -> http://localhost:15672
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    networks:
+      - ata-net
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    image: autotranslateai-api
+    container_name: ata-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ata-net
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    image: autotranslateai-worker
+    container_name: ata-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - worker-workspace:/app/workspace   # per-job intermediate media (audio.wav, vocals.wav, ...)
+      - models:/models                    # cached demucs / whisper model weights
+    networks:
+      - ata-net
+
+volumes:
+  pgdata:
+  rabbitmq-data:
+  worker-workspace:
+  models:
+
+networks:
+  ata-net:
+    driver: bridge

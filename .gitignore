@@ -1,0 +1,121 @@
+## ──────────────────────────────────────────────
+## .NET / Visual Studio
+## ──────────────────────────────────────────────
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+build/
+bld/
+[Bb]uild[Ll]og.*
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.sln.docstates
+*_i.c
+*_p.c
+*.rsuser
+*.svclog
+
+# Test / coverage results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+coverage*.json
+coverage*.xml
+coverage*.info
+TestResults/
+[Cc]overage[Rr]eport/
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+.nuget/
+
+# MSBuild / Roslyn
+*.binlog
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## ──────────────────────────────────────────────
+## Secrets & local config (DO NOT COMMIT)
+## ──────────────────────────────────────────────
+appsettings.*.local.json
+appsettings.Development.json
+secrets.json
+*.pfx
+*.p12
+.env
+.env.*
+!.env.example
+
+## ──────────────────────────────────────────────
+## AutoTranslateAI runtime artifacts
+## ──────────────────────────────────────────────
+# Per-job working directories / intermediate media (audio.wav, vocals.wav, sub.srt, tts/...)
+workspace/
+workspaces/
+output/
+tmp/
+*.wav
+*.mp3
+*.mp4
+*.mkv
+*.srt
+*.vtt
+
+# AI model files (whisper ggml, piper onnx, demucs) — too large for git
+models/
+*.bin
+*.onnx
+*.ggml
+
+## ──────────────────────────────────────────────
+## Docker local volumes
+## ──────────────────────────────────────────────
+.docker-data/
+docker/data/
+
+## ──────────────────────────────────────────────
+## OS noise
+## ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+*.swp
+
+# Claude Code
+CLAUDE.md
+
+
+# File Markdown
+CREDENTIALS.md
+PROVIDER_DESIGN.md
+ROADMAP.md
