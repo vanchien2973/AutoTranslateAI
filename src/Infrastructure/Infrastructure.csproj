@@ -20,15 +20,24 @@
 
   <ItemGroup>
     <PackageReference Include="AWSSDK.S3" Version="4.0.25.3" />
+    <PackageReference Include="CliWrap" Version="3.10.2" />
+    <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.50.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.17" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.17" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.17" />
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="9.0.17" />
     <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
+    <PackageReference Include="OpenAI" Version="2.1.0" />
+    <PackageReference Include="Whisper.net" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Application\Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Infrastructure.Tests" />
   </ItemGroup>
 
 </Project>

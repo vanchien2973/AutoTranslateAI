@@ -1,5 +1,12 @@
+using Application.Interfaces;
+using Infrastructure.AI.SpeechToText;
+using Infrastructure.AI.TextToSpeech;
+using Infrastructure.AI.Translation;
 using Infrastructure.Configuration;
 using Infrastructure.HealthChecks;
+using Infrastructure.Media.Demucs;
+using Infrastructure.Media.Downloader;
+using Infrastructure.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,7 +20,16 @@ public static class DependencyInjection
     {
         services.AddPersistence(configuration);
         services.AddProviders(configuration);
+        services.AddMediaTools(configuration);
         services.AddMessaging(configuration);
+        return services;
+    }
+
+    private static IServiceCollection AddMediaTools(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddValidatedOptions<MediaToolsOptions>(configuration, MediaToolsOptions.SectionName);
+        services.AddSingleton<IVideoDownloader, YtDlpVideoDownloader>();
+        services.AddSingleton<IDemucsService, DemucsService>();
         return services;
     }
 
@@ -50,8 +66,34 @@ public static class DependencyInjection
                 .AddCheck<R2StorageHealthCheck>("r2", tags: ["ready"]);
         }
 
-        // TODO: switch on configuration["Providers:Tts"] etc. to register the chosen ITtsService /
-        // ISpeechToTextService / ITranslationService / IStorageService implementation.
+        services.AddSingleton<ISpeechToTextService>(sp => providers.SpeechToText switch
+        {
+            "WhisperNet" => ActivatorUtilities.CreateInstance<WhisperNetSpeechToTextService>(sp),
+            var other => throw new InvalidOperationException($"Unknown SpeechToText provider: '{other}'"),
+        });
+
+        // Translation provider (config-switchable per PROVIDER_DESIGN.md).
+        services.AddSingleton<ITranslationService>(sp => providers.Translation switch
+        {
+            "OpenAI" => ActivatorUtilities.CreateInstance<OpenAiTranslationService>(sp),
+            var other => throw new InvalidOperationException($"Unknown Translation provider: '{other}'"),
+        });
+
+        // Text-to-speech provider.
+        services.AddSingleton<ITtsService>(sp => providers.Tts switch
+        {
+            "Azure" => ActivatorUtilities.CreateInstance<AzureTtsService>(sp),
+            var other => throw new InvalidOperationException($"Unknown Tts provider: '{other}'"),
+        });
+
+        // Output storage provider.
+        services.AddSingleton<IStorageService>(sp => providers.Storage switch
+        {
+            "R2" => ActivatorUtilities.CreateInstance<R2StorageService>(sp),
+            var other => throw new InvalidOperationException($"Unknown Storage provider: '{other}'"),
+        });
+
+        // TODO: add Ollama (Translation), Piper (Tts), Local/AzureBlob (Storage) cases when needed.
         return services;
     }
 
