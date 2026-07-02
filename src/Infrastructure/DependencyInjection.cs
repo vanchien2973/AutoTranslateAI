@@ -6,7 +6,10 @@ using Infrastructure.Configuration;
 using Infrastructure.HealthChecks;
 using Infrastructure.Media.Demucs;
 using Infrastructure.Media.Downloader;
+using Infrastructure.Media.FFmpeg;
 using Infrastructure.Storage;
+using Infrastructure.Workspace;
+using MassTransit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,20 +19,27 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        params Type[] consumerMarkers)
     {
         services.AddPersistence(configuration);
         services.AddProviders(configuration);
         services.AddMediaTools(configuration);
-        services.AddMessaging(configuration);
+        services.AddMessaging(configuration, consumerMarkers);
         return services;
     }
 
     private static IServiceCollection AddMediaTools(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddValidatedOptions<MediaToolsOptions>(configuration, MediaToolsOptions.SectionName);
+        services.AddValidatedOptions<WorkspaceOptions>(configuration, WorkspaceOptions.SectionName);
+        services.AddSingleton<IWorkspaceManager, WorkspaceManager>();
         services.AddSingleton<IVideoDownloader, YtDlpVideoDownloader>();
+        services.AddSingleton<IAudioExtractor, FfmpegAudioExtractor>();
         services.AddSingleton<IDemucsService, DemucsService>();
+        services.AddSingleton<IAudioTimelineAssembler, FfmpegAudioTimelineAssembler>();
+        services.AddSingleton<IAudioMixer, FfmpegAudioMixer>();
+        services.AddSingleton<IVideoRenderer, FfmpegVideoRenderer>();
         return services;
     }
 
@@ -72,7 +82,7 @@ public static class DependencyInjection
             var other => throw new InvalidOperationException($"Unknown SpeechToText provider: '{other}'"),
         });
 
-        // Translation provider (config-switchable per PROVIDER_DESIGN.md).
+        // Translation provider
         services.AddSingleton<ITranslationService>(sp => providers.Translation switch
         {
             "OpenAI" => ActivatorUtilities.CreateInstance<OpenAiTranslationService>(sp),
@@ -97,13 +107,36 @@ public static class DependencyInjection
         return services;
     }
 
-    private static IServiceCollection AddMessaging(this IServiceCollection services, IConfiguration configuration)
+    private static IServiceCollection AddMessaging(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        Type[] consumerMarkers)
     {
         services.AddValidatedOptions<RabbitMqOptions>(configuration, RabbitMqOptions.SectionName);
         services.AddHealthChecks()
             .AddCheck<RabbitMqConnectionHealthCheck>("rabbitmq", tags: ["ready"]);
 
-        // TODO: services.AddMassTransit(x => { x.UsingRabbitMq(...); });
+        var rabbit = configuration.GetSection(RabbitMqOptions.SectionName).Get<RabbitMqOptions>() ?? new RabbitMqOptions();
+
+        services.AddMassTransit(x =>
+        {
+            // Only the Worker passes consumer markers; the Api registers the bus for publishing only.
+            if (consumerMarkers.Length > 0)
+            {
+                x.AddConsumers(consumerMarkers.Select(marker => marker.Assembly).Distinct().ToArray());
+            }
+
+            x.UsingRabbitMq((context, cfg) =>
+            {
+                cfg.Host(rabbit.Host, rabbit.Port, rabbit.VirtualHost, host =>
+                {
+                    host.Username(rabbit.Username);
+                    host.Password(rabbit.Password);
+                });
+                cfg.ConfigureEndpoints(context);
+            });
+        });
+
         return services;
     }
 

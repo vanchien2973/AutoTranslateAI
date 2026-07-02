@@ -79,10 +79,8 @@ secrets.json
 ## AutoTranslateAI runtime artifacts
 ## ──────────────────────────────────────────────
 # Per-job working directories / intermediate media (audio.wav, vocals.wav, sub.srt, tts/...)
-workspace/
-workspaces/
-output/
-tmp/
+/workspace/
+/tmp/
 *.wav
 *.mp3
 *.mp4

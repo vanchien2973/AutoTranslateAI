@@ -1,6 +1,6 @@
+using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
-using Amazon.S3.Transfer;
 using Application.Interfaces;
 using Infrastructure.Configuration;
 using Microsoft.Extensions.Logging;
@@ -24,14 +24,24 @@ public sealed class R2StorageService : IStorageService, IDisposable
             ServiceURL = _options.Endpoint,
             ForcePathStyle = true,
             AuthenticationRegion = _options.Region,
+            RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
+            ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
         };
         _s3 = new AmazonS3Client(_options.AccessKeyId, _options.SecretAccessKey, config);
     }
 
     public async Task<string> UploadAsync(string localPath, string key, CancellationToken cancellationToken)
     {
-        var transfer = new TransferUtility(_s3);
-        await transfer.UploadAsync(localPath, _options.BucketName, key, cancellationToken);
+        var request = new PutObjectRequest
+        {
+            BucketName = _options.BucketName,
+            Key = key,
+            FilePath = localPath,
+            UseChunkEncoding = false,
+            DisablePayloadSigning = true,
+            DisableDefaultChecksumValidation = true,
+        };
+        await _s3.PutObjectAsync(request, cancellationToken);
 
         var url = R2UrlResolver.Resolve(_options.PublicUrl, key);
         _logger.LogInformation("Uploaded {Local} to R2 {Bucket}/{Key}", localPath, _options.BucketName, key);
