@@ -1,9 +1,10 @@
 using Application;
+using Application.Pipeline;
 using Infrastructure;
 using Serilog;
-using Workers;
+using Workers.Consumers;
+using Workers.Steps;
 
-// Bootstrap logger: captures anything thrown before the host (and full Serilog config) is built.
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateBootstrapLogger();
@@ -21,8 +22,22 @@ try
         .Enrich.FromLogContext());
 
     builder.Services.AddApplication();
-    builder.Services.AddInfrastructure(builder.Configuration);
-    builder.Services.AddHostedService<Worker>();
+    // Register the MassTransit consumer from this assembly so the Worker actually processes jobs.
+    builder.Services.AddInfrastructure(builder.Configuration, typeof(DubbingJobConsumer));
+
+    // Pipeline steps, registered in execution order; PipelineRunner resolves IEnumerable<IPipelineStep>
+    // and runs them ordered by StepType (Download..Upload) in a single pass for this milestone.
+    builder.Services.AddTransient<IPipelineStep, DownloadStep>();
+    builder.Services.AddTransient<IPipelineStep, ExtractAudioStep>();
+    builder.Services.AddTransient<IPipelineStep, SeparateBgmStep>();
+    builder.Services.AddTransient<IPipelineStep, TranscribeStep>();
+    builder.Services.AddTransient<IPipelineStep, TranslateStep>();
+    builder.Services.AddTransient<IPipelineStep, TtsStep>();
+    builder.Services.AddTransient<IPipelineStep, MixStep>();
+    builder.Services.AddTransient<IPipelineStep, RenderStep>();
+    builder.Services.AddTransient<IPipelineStep, UploadStep>();
+
+    builder.Services.AddScoped<PipelineRunner>();
 
     var host = builder.Build();
     host.Run();

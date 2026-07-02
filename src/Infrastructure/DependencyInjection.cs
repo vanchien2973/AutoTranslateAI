@@ -1,5 +1,15 @@
+using Application.Interfaces;
+using Infrastructure.AI.SpeechToText;
+using Infrastructure.AI.TextToSpeech;
+using Infrastructure.AI.Translation;
 using Infrastructure.Configuration;
 using Infrastructure.HealthChecks;
+using Infrastructure.Media.Demucs;
+using Infrastructure.Media.Downloader;
+using Infrastructure.Media.FFmpeg;
+using Infrastructure.Storage;
+using Infrastructure.Workspace;
+using MassTransit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,11 +19,27 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        params Type[] consumerMarkers)
     {
         services.AddPersistence(configuration);
         services.AddProviders(configuration);
-        services.AddMessaging(configuration);
+        services.AddMediaTools(configuration);
+        services.AddMessaging(configuration, consumerMarkers);
+        return services;
+    }
+
+    private static IServiceCollection AddMediaTools(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddValidatedOptions<MediaToolsOptions>(configuration, MediaToolsOptions.SectionName);
+        services.AddValidatedOptions<WorkspaceOptions>(configuration, WorkspaceOptions.SectionName);
+        services.AddSingleton<IWorkspaceManager, WorkspaceManager>();
+        services.AddSingleton<IVideoDownloader, YtDlpVideoDownloader>();
+        services.AddSingleton<IAudioExtractor, FfmpegAudioExtractor>();
+        services.AddSingleton<IDemucsService, DemucsService>();
+        services.AddSingleton<IAudioTimelineAssembler, FfmpegAudioTimelineAssembler>();
+        services.AddSingleton<IAudioMixer, FfmpegAudioMixer>();
+        services.AddSingleton<IVideoRenderer, FfmpegVideoRenderer>();
         return services;
     }
 
@@ -50,18 +76,67 @@ public static class DependencyInjection
                 .AddCheck<R2StorageHealthCheck>("r2", tags: ["ready"]);
         }
 
-        // TODO: switch on configuration["Providers:Tts"] etc. to register the chosen ITtsService /
-        // ISpeechToTextService / ITranslationService / IStorageService implementation.
+        services.AddSingleton<ISpeechToTextService>(sp => providers.SpeechToText switch
+        {
+            "WhisperNet" => ActivatorUtilities.CreateInstance<WhisperNetSpeechToTextService>(sp),
+            var other => throw new InvalidOperationException($"Unknown SpeechToText provider: '{other}'"),
+        });
+
+        // Translation provider
+        services.AddSingleton<ITranslationService>(sp => providers.Translation switch
+        {
+            "OpenAI" => ActivatorUtilities.CreateInstance<OpenAiTranslationService>(sp),
+            var other => throw new InvalidOperationException($"Unknown Translation provider: '{other}'"),
+        });
+
+        // Text-to-speech provider.
+        services.AddSingleton<ITtsService>(sp => providers.Tts switch
+        {
+            "Azure" => ActivatorUtilities.CreateInstance<AzureTtsService>(sp),
+            var other => throw new InvalidOperationException($"Unknown Tts provider: '{other}'"),
+        });
+
+        // Output storage provider.
+        services.AddSingleton<IStorageService>(sp => providers.Storage switch
+        {
+            "R2" => ActivatorUtilities.CreateInstance<R2StorageService>(sp),
+            var other => throw new InvalidOperationException($"Unknown Storage provider: '{other}'"),
+        });
+
+        // TODO: add Ollama (Translation), Piper (Tts), Local/AzureBlob (Storage) cases when needed.
         return services;
     }
 
-    private static IServiceCollection AddMessaging(this IServiceCollection services, IConfiguration configuration)
+    private static IServiceCollection AddMessaging(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        Type[] consumerMarkers)
     {
         services.AddValidatedOptions<RabbitMqOptions>(configuration, RabbitMqOptions.SectionName);
         services.AddHealthChecks()
             .AddCheck<RabbitMqConnectionHealthCheck>("rabbitmq", tags: ["ready"]);
 
-        // TODO: services.AddMassTransit(x => { x.UsingRabbitMq(...); });
+        var rabbit = configuration.GetSection(RabbitMqOptions.SectionName).Get<RabbitMqOptions>() ?? new RabbitMqOptions();
+
+        services.AddMassTransit(x =>
+        {
+            // Only the Worker passes consumer markers; the Api registers the bus for publishing only.
+            if (consumerMarkers.Length > 0)
+            {
+                x.AddConsumers(consumerMarkers.Select(marker => marker.Assembly).Distinct().ToArray());
+            }
+
+            x.UsingRabbitMq((context, cfg) =>
+            {
+                cfg.Host(rabbit.Host, rabbit.Port, rabbit.VirtualHost, host =>
+                {
+                    host.Username(rabbit.Username);
+                    host.Password(rabbit.Password);
+                });
+                cfg.ConfigureEndpoints(context);
+            });
+        });
+
         return services;
     }
 
