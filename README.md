@@ -393,11 +393,16 @@ Worker Phase2Consumer: chạy ◄─────────┘
 | GET | `/api/jobs/{id}/segments` | Lấy transcript để review |
 | PUT | `/api/jobs/{id}/segments/{segId}` | Sửa 1 segment |
 | PUT | `/api/jobs/{id}/segments/bulk` | Sửa nhiều segment |
+| POST | `/api/jobs/{id}/review/chat` | **AI assistant**: gửi tin nhắn, nhận đề xuất sửa (không ghi DB) |
+| GET | `/api/jobs/{id}/review/chat` | Lấy lịch sử hội thoại review |
+| POST | `/api/jobs/{id}/review/chat/{proposalId}/apply` | Áp dụng 1 đề xuất (qua đường ghi segment có sẵn) |
 | POST | `/api/jobs/{id}/confirm` | Confirm → kích hoạt Phase 2 |
 | POST | `/api/jobs/{id}/cancel` | Hủy job |
 | GET | `/api/jobs/{id}/download` | Tải video output |
 
-**SignalR:** hub `/hubs/jobs` push progress real-time.
+**SignalR:** hub `/hubs/jobs` push progress real-time (và tùy chọn stream token phản hồi của AI assistant).
+
+> **AI Review Assistant** — chatbox giúp user sửa transcript/bản dịch bằng hội thoại ("dịch câu 5 tự nhiên hơn", "gộp câu 12-13"). AI **đề xuất**, user duyệt mới ghi. Chỉ hoạt động khi `AwaitingReview`, dùng chung GPT-4.1 Nano, không thêm hạ tầng. Chi tiết ở `REVIEW_ASSISTANT_DESIGN.md`.
 
 ---
 

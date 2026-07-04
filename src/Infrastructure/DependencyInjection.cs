@@ -4,14 +4,18 @@ using Infrastructure.AI.TextToSpeech;
 using Infrastructure.AI.Translation;
 using Infrastructure.Configuration;
 using Infrastructure.HealthChecks;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Infrastructure.Media.Demucs;
 using Infrastructure.Media.Downloader;
 using Infrastructure.Media.FFmpeg;
+using Infrastructure.Resilience;
 using Infrastructure.Storage;
 using Infrastructure.Workspace;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Infrastructure.Repositories;
 
 namespace Infrastructure;
 
@@ -47,13 +51,25 @@ public static class DependencyInjection
     {
         var connectionString = configuration.GetConnectionString("Postgres");
 
-        // TODO: services.AddDbContext<AppDbContext>(o => o.UseNpgsql(connectionString));
+        // Pipeline state snapshot lives on the local workspace volume, so it works with or without a DB.
+        services.AddScoped<IPipelineStateStore, FilePipelineStateStore>();
 
-        // DB readiness check (tag "ready"); the Api maps it at /health/ready.
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
+            services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
+            services.AddScoped<IDubbingJobRepository, DubbingJobRepository>();
+
+            // Persist per-step status to JobSteps so a retried message resumes from the failed step.
+            services.AddScoped<IJobStepTracker, JobStepTracker>();
+
+            // DB readiness check (tag "ready"); the Api maps it at /health/ready.
             services.AddHealthChecks()
                 .AddNpgSql(connectionString, name: "postgres", tags: ["ready"]);
+        }
+        else
+        {
+            // No DB configured: skip resume tracking (every run starts fresh).
+            services.AddScoped<IJobStepTracker, NullJobStepTracker>();
         }
 
         return services;
@@ -68,6 +84,10 @@ public static class DependencyInjection
         services.AddValidatedOptions<WhisperNetOptions>(configuration, WhisperNetOptions.SectionName);
         services.AddValidatedOptions<PiperOptions>(configuration, PiperOptions.SectionName);
         services.AddValidatedOptions<R2Options>(configuration, R2Options.SectionName);
+        services.AddValidatedOptions<ResilienceOptions>(configuration, ResilienceOptions.SectionName);
+
+        // Shared Polly pipeline (retry + per-attempt timeout) injected into the OpenAI/Azure adapters.
+        services.AddSingleton<ExternalApiResiliencePipeline>();
 
         var providers = configuration.GetSection(ProviderOptions.SectionName).Get<ProviderOptions>() ?? new ProviderOptions();
         if (string.Equals(providers.Storage, "R2", StringComparison.OrdinalIgnoreCase))
@@ -133,6 +153,15 @@ public static class DependencyInjection
                     host.Username(rabbit.Username);
                     host.Password(rabbit.Password);
                 });
+
+                // Broker-level retry: on an unhandled consumer exception the message is redelivered with an
+                // incremental back-off. The pipeline is resume-aware (skips Completed JobSteps), so a retry
+                // re-runs only from the step that failed instead of the whole job.
+                cfg.UseMessageRetry(r => r.Incremental(
+                    rabbit.RetryLimit,
+                    TimeSpan.FromSeconds(rabbit.RetryInitialIntervalSeconds),
+                    TimeSpan.FromSeconds(rabbit.RetryIntervalIncrementSeconds)));
+
                 cfg.ConfigureEndpoints(context);
             });
         });

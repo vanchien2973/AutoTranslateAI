@@ -1,6 +1,7 @@
 using Application.Dtos;
 using Application.Interfaces;
 using Infrastructure.Configuration;
+using Infrastructure.Resilience;
 using Microsoft.CognitiveServices.Speech;
 using Microsoft.CognitiveServices.Speech.Audio;
 using Microsoft.Extensions.Logging;
@@ -12,11 +13,16 @@ namespace Infrastructure.AI.TextToSpeech;
 public sealed class AzureTtsService : ITtsService
 {
     private readonly AzureSpeechOptions _options;
+    private readonly ExternalApiResiliencePipeline _resilience;
     private readonly ILogger<AzureTtsService> _logger;
 
-    public AzureTtsService(IOptions<AzureSpeechOptions> options, ILogger<AzureTtsService> logger)
+    public AzureTtsService(
+        IOptions<AzureSpeechOptions> options,
+        ExternalApiResiliencePipeline resilience,
+        ILogger<AzureTtsService> logger)
     {
         _options = options.Value;
+        _resilience = resilience;
         _logger = logger;
     }
 
@@ -26,13 +32,25 @@ public sealed class AzureTtsService : ITtsService
             ? AzureVoiceCatalog.ResolveVoice(request.LanguageCode, request.Gender)
             : request.VoiceId!;
 
+        var ssml = SsmlBuilder.Build(request.Text, voice, request.LanguageCode, request.RateFactor);
+
+        // Each retry attempt builds a fresh synthesizer so a spent/aborted one is never reused; the
+        // per-attempt timeout in the pipeline guards against a hung Azure call.
+        var durationMs = await _resilience.Pipeline.ExecuteAsync(
+            async _ => await SynthesizeOnceAsync(ssml, request.OutputPath),
+            cancellationToken);
+
+        _logger.LogInformation("Synthesized {Ms}ms with voice {Voice} to {Path}", durationMs, voice, request.OutputPath);
+        return new TtsResult(request.OutputPath, durationMs, voice);
+    }
+
+    private async Task<long> SynthesizeOnceAsync(string ssml, string outputPath)
+    {
         var speechConfig = CreateSpeechConfig();
         speechConfig.SetSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat.Riff16Khz16BitMonoPcm);
 
-        using var audioConfig = AudioConfig.FromWavFileOutput(request.OutputPath);
+        using var audioConfig = AudioConfig.FromWavFileOutput(outputPath);
         using var synthesizer = new SpeechSynthesizer(speechConfig, audioConfig);
-
-        var ssml = SsmlBuilder.Build(request.Text, voice, request.LanguageCode, request.RateFactor);
         using var result = await synthesizer.SpeakSsmlAsync(ssml);
 
         if (result.Reason != ResultReason.SynthesizingAudioCompleted)
@@ -42,10 +60,7 @@ public sealed class AzureTtsService : ITtsService
                 $"Azure TTS failed ({result.Reason}): {details.ErrorCode} - {details.ErrorDetails}");
         }
 
-        var durationMs = (long)result.AudioDuration.TotalMilliseconds;
-        _logger.LogInformation("Synthesized {Ms}ms with voice {Voice} to {Path}", durationMs, voice, request.OutputPath);
-
-        return new TtsResult(request.OutputPath, durationMs, voice);
+        return (long)result.AudioDuration.TotalMilliseconds;
     }
 
     public Task<IReadOnlyList<VoiceInfo>> ListVoicesAsync(string languageCode, CancellationToken cancellationToken) =>
