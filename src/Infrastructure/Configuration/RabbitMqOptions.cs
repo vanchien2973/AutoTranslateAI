@@ -13,4 +13,10 @@ public sealed class RabbitMqOptions
     public string Password { get; init; } = "ata_dev_password";
 
     public string VirtualHost { get; init; } = "/";
+
+    public int RetryLimit { get; init; } = 3;
+
+    public int RetryInitialIntervalSeconds { get; init; } = 5;
+
+    public int RetryIntervalIncrementSeconds { get; init; } = 15;
 }
