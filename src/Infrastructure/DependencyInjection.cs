@@ -4,6 +4,7 @@ using Infrastructure.AI.TextToSpeech;
 using Infrastructure.AI.Translation;
 using Infrastructure.Configuration;
 using Infrastructure.HealthChecks;
+using Infrastructure.Messaging;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Infrastructure.Media.Demucs;
@@ -56,7 +57,11 @@ public static class DependencyInjection
 
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
-            services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
+            // Factory gives short-lived contexts (JobStepTracker uses its own so it never shares the
+            // change-tracker with the aggregate); the scoped AppDbContext (from the factory) is for the repository.
+            services.AddDbContextFactory<AppDbContext>(options => options
+                .UseNpgsql(connectionString));
+            services.AddScoped<AppDbContext>(sp => sp.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContext());
             services.AddScoped<IDubbingJobRepository, DubbingJobRepository>();
 
             // Persist per-step status to JobSteps so a retried message resumes from the failed step.
@@ -162,9 +167,15 @@ public static class DependencyInjection
                     TimeSpan.FromSeconds(rabbit.RetryInitialIntervalSeconds),
                     TimeSpan.FromSeconds(rabbit.RetryIntervalIncrementSeconds)));
 
+                // Serialize processing so the same job is never handled by two consumers at once.
+                cfg.UseConcurrencyLimit(rabbit.ConcurrencyLimit);
+
                 cfg.ConfigureEndpoints(context);
             });
         });
+
+        // Progress emission (Worker publishes JobProgressUpdated; API consumes → SignalR).
+        services.AddScoped<IProgressNotifier, MassTransitProgressNotifier>();
 
         return services;
     }

@@ -48,6 +48,19 @@ public sealed class R2StorageService : IStorageService, IDisposable
         return url;
     }
 
+    public async Task<string> GetPresignedUrlAsync(string key, TimeSpan expiry, CancellationToken cancellationToken)
+    {
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = _options.BucketName,
+            Key = key,
+            Verb = HttpVerb.GET,
+            Expires = DateTime.UtcNow.Add(expiry),
+        };
+
+        return await _s3.GetPreSignedURLAsync(request);
+    }
+
     public async Task<Stream> DownloadAsync(string key, CancellationToken cancellationToken)
     {
         var response = await _s3.GetObjectAsync(_options.BucketName, key, cancellationToken);

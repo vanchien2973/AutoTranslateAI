@@ -1,4 +1,6 @@
+using Api.Consumers;
 using Api.Extensions;
+using Api.Hubs;
 using Application;
 using Infrastructure;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -6,7 +8,6 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog;
 using System.Text.Json;
 
-// Bootstrap logger: captures anything thrown before the host (and full Serilog config) is built.
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateBootstrapLogger();
@@ -23,10 +24,22 @@ try
         .ReadFrom.Services(services)
         .Enrich.FromLogContext());
 
+    // CORS so a frontend on another origin can call the API + SignalR hub. SignalR needs AllowCredentials,
+    // which forbids AllowAnyOrigin — so origins are an explicit allow-list (configurable via "Cors:AllowedOrigins").
+    const string CorsPolicy = "frontend";
+    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+        ?? ["http://localhost:3000", "http://localhost:5173"];
+
     // Add services to the container.
+    builder.Services.AddCors(options => options.AddPolicy(CorsPolicy, policy => policy
+        .WithOrigins(allowedOrigins)
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials()));
     builder.Services.AddControllers();
+    builder.Services.AddSignalR();
     builder.Services.AddApplication();
-    builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services.AddInfrastructure(builder.Configuration, typeof(JobProgressConsumer));
     builder.Services.AddSwagger();
 
     // Liveness has no checks (process is up); readiness runs the "ready"-tagged checks
@@ -39,13 +52,11 @@ try
     app.UseSerilogRequestLogging();
 
     app.UseHttpsRedirection();
-
+    app.UseCors(CorsPolicy);
     app.UseAuthorization();
-
     app.MapControllers();
-
+    app.MapHub<JobProgressHub>("/hubs/jobs");
     app.ConfigureSwagger();
-
     app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });
     app.MapHealthChecks("/health/ready", new HealthCheckOptions
     {

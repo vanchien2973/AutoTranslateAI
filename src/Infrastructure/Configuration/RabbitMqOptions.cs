@@ -19,4 +19,6 @@ public sealed class RabbitMqOptions
     public int RetryInitialIntervalSeconds { get; init; } = 5;
 
     public int RetryIntervalIncrementSeconds { get; init; } = 15;
+
+    public int ConcurrencyLimit { get; init; } = 1;
 }

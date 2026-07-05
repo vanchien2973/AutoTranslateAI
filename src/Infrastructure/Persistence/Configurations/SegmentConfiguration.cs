@@ -11,7 +11,8 @@ public sealed class SegmentConfiguration : IEntityTypeConfiguration<Segment>
         builder.ToTable("Segments");
         builder.HasKey(s => s.Id);
 
-        builder.UseXminAsConcurrencyToken();
+        builder.Property(s => s.Id).ValueGeneratedNever();
+        builder.Property(s => s.RowVersion).IsConcurrencyToken();
 
         builder.Property(s => s.OriginalText).IsRequired();
         builder.Property(s => s.SpeakerLabel).HasMaxLength(50);

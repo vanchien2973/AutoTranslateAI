@@ -1,6 +1,6 @@
 using Domain.Enums;
 
-namespace Application.Pipeline;
+namespace Application.Dtos;
 
 public sealed record PipelineRequest(
     Guid JobId,
@@ -8,4 +8,5 @@ public sealed record PipelineRequest(
     string AudioLanguage,
     string SubtitleLanguage,
     bool EnableDubbing = true,
-    VoiceGender DefaultVoiceGender = VoiceGender.Female);
+    VoiceGender DefaultVoiceGender = VoiceGender.Female,
+    IReadOnlyList<PipelineSegment>? Segments = null);

@@ -46,6 +46,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="Application.Dtos" />
+    <Using Include="Application.Enums" />
+    <Using Include="Application.Helpers" />
+    <Using Include="Application.Mappings" />
+    <Using Include="Application.Pipeline" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Infrastructure.Tests" />
   </ItemGroup>
 

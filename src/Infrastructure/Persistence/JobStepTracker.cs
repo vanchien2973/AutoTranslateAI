@@ -1,7 +1,7 @@
 using Application.Interfaces;
+using Application.Pipeline;
 using Domain.Entities;
 using Domain.Enums;
-using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Persistence;
@@ -10,14 +10,16 @@ public sealed class JobStepTracker : IJobStepTracker
 {
     private const int MaxConcurrencyRetries = 3;
 
-    private readonly AppDbContext _dbContext;
+    private readonly IDbContextFactory<AppDbContext> _contextFactory;
 
-    public JobStepTracker(AppDbContext dbContext) => _dbContext = dbContext;
+    public JobStepTracker(IDbContextFactory<AppDbContext> contextFactory) => _contextFactory = contextFactory;
 
     public async Task<IReadOnlySet<StepType>> GetCompletedStepsAsync(Guid jobId, CancellationToken cancellationToken)
     {
+        await using var db = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
         // Finished = Completed or Skipped; both must not re-run on resume. Project only StepType.
-        var finished = await _dbContext.JobSteps
+        var finished = await db.JobSteps
             .Where(step => step.JobId == jobId
                 && (step.Status == JobStepStatus.Completed || step.Status == JobStepStatus.Skipped))
             .Select(step => step.StepType)
@@ -26,48 +28,32 @@ public sealed class JobStepTracker : IJobStepTracker
         return finished.ToHashSet();
     }
 
-    public async Task StartAsync(Guid jobId, StepType stepType, CancellationToken cancellationToken)
-    {
-        var step = await GetOrCreateAsync(jobId, stepType, cancellationToken);
-        step.Start();
-        await _dbContext.SaveChangesWithRetryAsync(MaxConcurrencyRetries, cancellationToken);
-    }
+    public Task StartAsync(Guid jobId, StepType stepType, CancellationToken cancellationToken) =>
+        MutateAsync(jobId, stepType, step => step.Start(), cancellationToken);
 
-    public async Task CompleteAsync(Guid jobId, StepType stepType, string? outputPath, CancellationToken cancellationToken)
-    {
-        var step = await GetOrCreateAsync(jobId, stepType, cancellationToken);
-        step.Complete(outputPath);
-        await _dbContext.SaveChangesWithRetryAsync(MaxConcurrencyRetries, cancellationToken);
-    }
+    public Task CompleteAsync(Guid jobId, StepType stepType, string? outputPath, CancellationToken cancellationToken) =>
+        MutateAsync(jobId, stepType, step => step.Complete(outputPath), cancellationToken);
 
-    public async Task FailAsync(Guid jobId, StepType stepType, string error, CancellationToken cancellationToken)
-    {
-        var step = await GetOrCreateAsync(jobId, stepType, cancellationToken);
-        step.Fail(error);
-        await _dbContext.SaveChangesWithRetryAsync(MaxConcurrencyRetries, cancellationToken);
-    }
+    public Task FailAsync(Guid jobId, StepType stepType, string error, CancellationToken cancellationToken) =>
+        MutateAsync(jobId, stepType, step => step.Fail(error), cancellationToken);
 
-    public async Task SkipAsync(Guid jobId, StepType stepType, CancellationToken cancellationToken)
-    {
-        var step = await GetOrCreateAsync(jobId, stepType, cancellationToken);
-        step.Skip();
-        await _dbContext.SaveChangesWithRetryAsync(MaxConcurrencyRetries, cancellationToken);
-    }
+    public Task SkipAsync(Guid jobId, StepType stepType, CancellationToken cancellationToken) =>
+        MutateAsync(jobId, stepType, step => step.Skip(), cancellationToken);
 
-    private async Task<JobStep> GetOrCreateAsync(Guid jobId, StepType stepType, CancellationToken cancellationToken)
+    private async Task MutateAsync(Guid jobId, StepType stepType, Action<JobStep> mutate, CancellationToken cancellationToken)
     {
-        var step = await _dbContext.JobSteps
+        await using var db = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var step = await db.JobSteps
             .FirstOrDefaultAsync(s => s.JobId == jobId && s.StepType == stepType, cancellationToken);
 
         if (step is null)
         {
-            step = new JobStep(jobId, stepType, PhaseOf(stepType));
-            await _dbContext.JobSteps.AddAsync(step, cancellationToken);
+            step = new JobStep(jobId, stepType, StepPhases.PhaseOf(stepType));
+            await db.JobSteps.AddAsync(step, cancellationToken);
         }
 
-        return step;
+        mutate(step);
+        await db.SaveChangesWithRetryAsync(MaxConcurrencyRetries, cancellationToken);
     }
-
-    // Phase 1 = Download..Translate; Phase 2 = Tts..Publish (matches the 2-phase pipeline split).
-    private static int PhaseOf(StepType stepType) => stepType <= StepType.Translate ? 1 : 2;
 }

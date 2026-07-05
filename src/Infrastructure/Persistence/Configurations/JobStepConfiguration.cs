@@ -11,6 +11,8 @@ public sealed class JobStepConfiguration : IEntityTypeConfiguration<JobStep>
         builder.ToTable("JobSteps");
         builder.HasKey(s => s.Id);
 
+        builder.Property(s => s.Id).ValueGeneratedNever();
+
         builder.Property(s => s.OutputPath);
         builder.Property(s => s.ErrorMessage);
 

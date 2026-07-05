@@ -18,6 +18,7 @@ public sealed class ResumeAfterCrashTests : IAsyncLifetime
         .Build();
 
     private string _workspaceRoot = string.Empty;
+    private IDbContextFactory<AppDbContext> _dbFactory = null!;
 
     public async Task InitializeAsync()
     {
@@ -25,6 +26,13 @@ public sealed class ResumeAfterCrashTests : IAsyncLifetime
         await using var db = CreateDbContext();
         await db.Database.EnsureCreatedAsync();
         _workspaceRoot = Path.Combine(Path.GetTempPath(), "ata-resume-" + Guid.NewGuid());
+        _dbFactory = new TestDbContextFactory(_postgres.GetConnectionString());
+    }
+
+    private sealed class TestDbContextFactory(string connectionString) : IDbContextFactory<AppDbContext>
+    {
+        public AppDbContext CreateDbContext() =>
+            new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(connectionString).Options);
     }
 
     public async Task DisposeAsync()
@@ -57,21 +65,15 @@ public sealed class ResumeAfterCrashTests : IAsyncLifetime
         var request = new PipelineRequest(jobId, "https://youtu.be/x", "vi", "vi");
 
         // Act 1: first delivery runs Download + ExtractAudio, then Transcribe throws (the "kill").
-        await using (var db1 = CreateDbContext())
-        {
-            var runner1 = MakeRunner(steps, workspace, db1);
-            var crash = () => runner1.RunAsync(request, CancellationToken.None);
-            await crash.Should().ThrowAsync<InvalidOperationException>();
-        }
+        var runner1 = MakeRunner(steps, workspace);
+        var crash = () => runner1.RunAsync(request, PipelinePhase.Phase1, CancellationToken.None);
+        await crash.Should().ThrowAsync<InvalidOperationException>();
 
         var afterCrash = await StepStatusesAsync(jobId);
 
-        // Act 2: message redelivered to a "restarted" worker (fresh DbContext), same workspace/DB state.
-        await using (var db2 = CreateDbContext())
-        {
-            var runner2 = MakeRunner(steps, workspace, db2);
-            await runner2.RunAsync(request, CancellationToken.None);
-        }
+        // Act 2: message redelivered to a "restarted" worker, same workspace/DB state.
+        var runner2 = MakeRunner(steps, workspace);
+        await runner2.RunAsync(request, PipelinePhase.Phase1, CancellationToken.None);
 
         var afterResume = await StepStatusesAsync(jobId);
 
@@ -95,8 +97,9 @@ public sealed class ResumeAfterCrashTests : IAsyncLifetime
         transcribeStep.RetryCount.Should().Be(1);
     }
 
-    private PipelineRunner MakeRunner(IPipelineStep[] steps, IWorkspaceManager workspace, AppDbContext db) =>
-        new(steps, workspace, new JobStepTracker(db), new FilePipelineStateStore(workspace), NullLogger<PipelineRunner>.Instance);
+    private PipelineRunner MakeRunner(IPipelineStep[] steps, IWorkspaceManager workspace) =>
+        new(steps, workspace, new JobStepTracker(_dbFactory), new FilePipelineStateStore(workspace),
+            Substitute.For<IProgressNotifier>(), NullLogger<PipelineRunner>.Instance);
 
     private async Task<Guid> SeedJobAsync()
     {

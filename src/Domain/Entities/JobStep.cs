@@ -93,6 +93,16 @@ public sealed class JobStep : BaseEntity
         CompletedAt = DateTimeOffset.UtcNow;
     }
 
+    /// <summary>Put the step in Pending to restart (use when reopening review — reset the Phase 2 steps). Keep RetryCount as history.</summary>
+    public void Reset()
+    {
+        Status = JobStepStatus.Pending;
+        StartedAt = null;
+        CompletedAt = null;
+        DurationMs = null;
+        ErrorMessage = null;
+    }
+
     // Elapsed since StartedAt in ms; 0 if the step never started.
     private long ElapsedMs() =>
         StartedAt is { } started

@@ -1,6 +1,6 @@
 using Domain.Enums;
 
-namespace Application.Pipeline;
+namespace Application.Dtos;
 
 public sealed class PipelineSegment
 {
@@ -15,5 +15,13 @@ public sealed class PipelineSegment
     public VoiceGender? Gender { get; set; }
     public string? AssignedVoice { get; set; }
     public string? TtsAudioPath { get; set; }
+    public long? TtsDurationMs { get; set; }
+
+    // True if the audio text changed after a TTS clip was made — set when seeding from the DB.
+    public bool NeedsTtsRegenerate { get; set; }
+
     public double DurationSeconds => EndTime - StartTime;
+
+    // TTS is (re)synthesized only when there is no clip yet or the audio text changed; otherwise reuse the clip.
+    public bool NeedsTtsSynthesis => NeedsTtsRegenerate || TtsAudioPath is null;
 }

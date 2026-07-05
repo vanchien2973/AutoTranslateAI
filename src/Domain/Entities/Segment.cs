@@ -2,7 +2,7 @@ using Domain.Common;
 
 namespace Domain.Entities;
 
-public sealed class Segment : BaseEntity, IAuditableEntity
+public sealed class Segment : BaseEntity, IAuditableEntity, IVersioned
 {
     private Segment()
     {
@@ -35,6 +35,7 @@ public sealed class Segment : BaseEntity, IAuditableEntity
     public bool NeedsTtsRegenerate { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
+    public int RowVersion { get; private set; }
     public double Duration => EndTime - StartTime;
 
     /// <summary>

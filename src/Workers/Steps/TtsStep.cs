@@ -2,6 +2,7 @@ using Application.Dtos;
 using Application.Interfaces;
 using Application.Pipeline;
 using Domain.Enums;
+using Microsoft.Extensions.Logging;
 
 namespace Workers.Steps;
 
@@ -16,12 +17,18 @@ public sealed class TtsStep : IPipelineStep
     private readonly ITtsService _tts;
     private readonly IAudioTimelineAssembler _assembler;
     private readonly IWorkspaceManager _workspace;
+    private readonly ILogger<TtsStep> _logger;
 
-    public TtsStep(ITtsService tts, IAudioTimelineAssembler assembler, IWorkspaceManager workspace)
+    public TtsStep(
+        ITtsService tts,
+        IAudioTimelineAssembler assembler,
+        IWorkspaceManager workspace,
+        ILogger<TtsStep> logger)
     {
         _tts = tts;
         _assembler = assembler;
         _workspace = workspace;
+        _logger = logger;
     }
 
     public StepType StepType => StepType.Tts;
@@ -38,6 +45,8 @@ public sealed class TtsStep : IPipelineStep
             return StepResult.Skip("No segments to synthesize.");
         }
 
+        var synthesized = 0;
+        var reused = 0;
         var clips = new List<TimelineClip>();
         foreach (var segment in context.Segments)
         {
@@ -48,22 +57,38 @@ public sealed class TtsStep : IPipelineStep
             }
 
             var outputPath = _workspace.GetArtifactPath(context.JobId, $"tts/seg-{segment.Index:D4}.wav");
+
+            // Skip the (paid) TTS calls when this segment already has a clip and its audio text didn't change.
+            if (!segment.NeedsTtsSynthesis)
+            {
+                reused++;
+                _logger.LogInformation("Job {JobId}: TTS reuse seg {Index} (unchanged)", context.JobId, segment.Index);
+                clips.Add(new TimelineClip(segment.TtsAudioPath!, segment.StartTime));
+                continue;
+            }
+
+            synthesized++;
+            _logger.LogInformation("Job {JobId}: TTS synth seg {Index}", context.JobId, segment.Index);
             var gender = segment.Gender ?? context.DefaultVoiceGender;
 
             // First pass at natural speed to measure duration, then re-synthesize to fit the slot.
             var natural = await _tts.SynthesizeAsync(
                 new TtsRequest(text, context.AudioLanguage, gender, segment.AssignedVoice, 1.0, outputPath),
                 cancellationToken);
+            var durationMs = natural.DurationMs;
 
             var rateFactor = RateFactorCalculator.Compute(natural.DurationMs / 1000.0, segment.DurationSeconds);
             if (Math.Abs(rateFactor - 1.0) > RateTolerance)
             {
-                await _tts.SynthesizeAsync(
+                var adjusted = await _tts.SynthesizeAsync(
                     new TtsRequest(text, context.AudioLanguage, gender, segment.AssignedVoice, rateFactor, outputPath),
                     cancellationToken);
+                durationMs = adjusted.DurationMs;
             }
 
             segment.TtsAudioPath = outputPath;
+            segment.TtsDurationMs = durationMs;
+            segment.NeedsTtsRegenerate = false;
             clips.Add(new TimelineClip(outputPath, segment.StartTime));
         }
 
@@ -71,6 +96,8 @@ public sealed class TtsStep : IPipelineStep
         {
             return StepResult.Skip("No segment text to synthesize.");
         }
+
+        _logger.LogInformation("Job {JobId}: TTS synthesized {Synth}, reused {Reused}", context.JobId, synthesized, reused);
 
         var vocalsPath = _workspace.GetArtifactPath(context.JobId, "dubbed_vocals.wav");
         context.DubbedVocalsPath = await _assembler.AssembleAsync(

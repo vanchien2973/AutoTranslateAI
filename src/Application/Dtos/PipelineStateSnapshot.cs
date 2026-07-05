@@ -1,4 +1,6 @@
-namespace Application.Pipeline;
+using Application.Pipeline;
+
+namespace Application.Dtos;
 
 public sealed class PipelineStateSnapshot
 {

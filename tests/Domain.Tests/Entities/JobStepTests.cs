@@ -65,4 +65,20 @@ public class JobStepTests
         step.Status.Should().Be(JobStepStatus.Running);
         step.RetryCount.Should().Be(1);
     }
+
+    [Fact]
+    public void Given_CompletedStep_When_Reset_Then_MovesToPending()
+    {
+        // Arrange
+        var step = NewStep();
+        step.Start();
+        step.Complete("out.wav");
+
+        // Act
+        step.Reset();
+
+        // Assert
+        step.Status.Should().Be(JobStepStatus.Pending);
+        step.CompletedAt.Should().BeNull();
+    }
 }

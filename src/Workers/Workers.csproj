@@ -23,4 +23,12 @@
     <ProjectReference Include="..\Application\Application.csproj" />
     <ProjectReference Include="..\Infrastructure\Infrastructure.csproj" />
   </ItemGroup>
+  
+  <ItemGroup>
+    <Using Include="Application.Dtos" />
+    <Using Include="Application.Enums" />
+    <Using Include="Application.Helpers" />
+    <Using Include="Application.Mappings" />
+    <Using Include="Application.Pipeline" />
+  </ItemGroup>
 </Project>
