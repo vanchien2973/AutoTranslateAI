@@ -1,8 +1,9 @@
 using Domain.Common;
+using Domain.Exceptions;
 
 namespace Domain.Entities;
 
-public sealed class Segment : BaseEntity, IAuditableEntity
+public sealed class Segment : BaseEntity, IAuditableEntity, IVersioned
 {
     private Segment()
     {
@@ -35,6 +36,7 @@ public sealed class Segment : BaseEntity, IAuditableEntity
     public bool NeedsTtsRegenerate { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
+    public int RowVersion { get; private set; }
     public double Duration => EndTime - StartTime;
 
     /// <summary>
@@ -96,6 +98,34 @@ public sealed class Segment : BaseEntity, IAuditableEntity
         TtsAudioPath = ttsAudioPath;
         TtsDurationMs = ttsDurationMs;
         NeedsTtsRegenerate = false;
+        Touch();
+    }
+
+    /// <summary>
+    /// Adjust the segment's time frame (StartTime/EndTime). Changing the timing will change the rate-factor during synthesis, so mark it as necessary to resynthesize if you already have a clip. 
+    /// Neighbor overlap constraints are checked by the aggregate root.
+    /// </summary>
+    public void AdjustTiming(double startTime, double endTime)
+    {
+        if (startTime < 0)
+        {
+            throw new BusinessRuleViolationException("Segment start time cannot be negative.");
+        }
+
+        if (endTime <= startTime)
+        {
+            throw new BusinessRuleViolationException("Segment end time must be after the start time.");
+        }
+
+        StartTime = startTime;
+        EndTime = endTime;
+
+        // Timing drives the TTS rate factor, so an existing clip must be re-synthesized.
+        if (TtsAudioPath is not null)
+        {
+            NeedsTtsRegenerate = true;
+        }
+
         Touch();
     }
 

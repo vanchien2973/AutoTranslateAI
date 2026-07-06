@@ -10,11 +10,25 @@
     <Folder Include="Features\" />
     <Folder Include="Interfaces\" />
     <Folder Include="Dtos\" />
+    <Folder Include="Enums\" />
+    <Folder Include="Helpers\" />
+    <Folder Include="Mappings\" />
     <Folder Include="Validators\" />
     <Folder Include="Pipeline\" />
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="Application.Dtos" />
+    <Using Include="Application.Enums" />
+    <Using Include="Application.Helpers" />
+    <Using Include="Application.Mappings" />
+    <Using Include="Application.Pipeline" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="FluentValidation" Version="11.12.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.12.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.17" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.17" />
   </ItemGroup>

@@ -4,7 +4,7 @@ using Domain.Exceptions;
 
 namespace Domain.Entities;
 
-public sealed class DubbingJob : BaseEntity, IAuditableEntity
+public sealed class DubbingJob : BaseEntity, IAuditableEntity, IVersioned
 {
     // Valid transition table: from a status -> set of allowed next statuses.
     // Failed can go back to phases to RESUME from a failed step; Completed/Cancelled are terminal states.
@@ -19,7 +19,7 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity
             [JobStatus.ProcessingPhase2] = [JobStatus.Publishing, JobStatus.Completed, JobStatus.Failed, JobStatus.Cancelled],
             [JobStatus.Publishing] = [JobStatus.Completed, JobStatus.Failed],
             [JobStatus.Failed] = [JobStatus.DownloadingMedia, JobStatus.ProcessingPhase1, JobStatus.ProcessingPhase2, JobStatus.Cancelled],
-            [JobStatus.Completed] = [],
+            [JobStatus.Completed] = [JobStatus.AwaitingReview], // reopen review to edit + re-run Phase 2
             [JobStatus.Cancelled] = [],
         };
 
@@ -85,6 +85,7 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity
     public string? OutputFilePath { get; private set; }
     public string? WorkspacePath { get; private set; }
     public Guid? UserId { get; private set; }
+    public int RowVersion { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
     public DateTimeOffset? StartedAt { get; private set; }
@@ -148,8 +149,56 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity
         ConfirmedAt = DateTimeOffset.UtcNow;
     }
 
+    /// <summary>
+    /// Reopen a completed job to edit the transcript and then run Phase 2 again (Completed -> AwaitingReview). 
+    /// Reset the Phase 2 steps to Pending so they run again; Phase 1 remains unchanged (do not re-transcribe). 
+    /// This ensures that when confirming, only the synth segment with NeedsTtsRegenerate (edited) is present in the TTS; the rest reuses the old clip
+    /// </summary>
+    public void ReopenForReview()
+    {
+        // Reopen is only meaningful for a finished job; the Phase-1 -> AwaitingReview path is MarkAwaitingReview.
+        if (Status != JobStatus.Completed)
+        {
+            throw new InvalidStateTransitionException(nameof(DubbingJob), Status, JobStatus.AwaitingReview);
+        }
+
+        TransitionTo(JobStatus.AwaitingReview);
+
+        foreach (var step in _steps.Where(step => step.Phase == 2))
+        {
+            step.Reset();
+        }
+
+        OutputFilePath = null;
+        CompletedAt = null;
+        CurrentStep = null;
+        ReviewReadyAt = DateTimeOffset.UtcNow;
+        Touch();
+    }
+
     /// <summary>The worker receives the Phase 2 message and starts TTS/Mix/Render (ConfirmedQueued/Failed -> ProcessingPhase2).</summary>
     public void StartPhase2() => TransitionTo(JobStatus.ProcessingPhase2);
+
+    /// <summary>
+    /// Move the job to Processing Phase 2, ensuring safety when calling it back (idempotent) — used for Phase2Consumer when receiving messages/resumes: 
+    /// if a message is retryed, the process can see that the job is already in ProcessingPhase 2 (it wasn't marked Failed the previous time) so it's skipped, preventing incorrect transitions.
+    /// </summary>
+    public void BeginPhase2Processing()
+    {
+        switch (Status)
+        {
+            case JobStatus.ProcessingPhase2:
+                return; // Already processing Phase 2 (a re-delivered/retried message).
+            case JobStatus.ConfirmedQueued:
+            case JobStatus.Failed:
+                TransitionTo(JobStatus.ProcessingPhase2);
+                break;
+            default:
+                throw new InvalidStateTransitionException(nameof(DubbingJob), Status, JobStatus.ProcessingPhase2);
+        }
+
+        CurrentStep = StepType.Tts;
+    }
 
     /// <summary>Start uploading/publishing results (ProcessingPhase2 -> Publishing).</summary>
     public void StartPublishing()
@@ -221,6 +270,34 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity
         var step = new JobStep(Id, stepType, phase);
         _steps.Add(step);
         return step;
+    }
+
+    /// <summary>
+    /// Adjust timing for 1 segment; aggregate root maintains invariance across segments: no overlapping of the preceding/following segment.
+    /// </summary>
+    public void AdjustSegmentTiming(Guid segmentId, double startTime, double endTime)
+    {
+        var ordered = _segments.OrderBy(segment => segment.SegmentIndex).ToList();
+        var position = ordered.FindIndex(segment => segment.Id == segmentId);
+        if (position < 0)
+        {
+            throw new BusinessRuleViolationException($"Segment {segmentId} does not belong to this job.");
+        }
+
+        var previousEnd = position > 0 ? ordered[position - 1].EndTime : 0.0;
+        if (startTime < previousEnd)
+        {
+            throw new BusinessRuleViolationException("Segment start overlaps the previous segment.");
+        }
+
+        if (position < ordered.Count - 1 && endTime > ordered[position + 1].StartTime)
+        {
+            throw new BusinessRuleViolationException("Segment end overlaps the next segment.");
+        }
+
+        // Segment enforces its own start<end / non-negative invariant.
+        ordered[position].AdjustTiming(startTime, endTime);
+        Touch();
     }
 
     // Central guard: validates the requested transition against AllowedTransitions before applying it.

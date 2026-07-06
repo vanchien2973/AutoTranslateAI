@@ -20,7 +20,7 @@ public sealed class UploadStep : IPipelineStep
             return StepResult.Fail("No rendered output to upload.");
         }
 
-        var key = $"{context.JobId:N}/output.mp4";
+        var key = OutputStorageKey.For(context.JobId);
         context.OutputUrl = await _storage.UploadAsync(context.OutputVideoPath, key, cancellationToken);
         context.OutputStorageKey = key;
 

@@ -11,7 +11,8 @@ public sealed class DubbingJobConfiguration : IEntityTypeConfiguration<DubbingJo
         builder.ToTable("DubbingJobs");
         builder.HasKey(j => j.Id);
 
-        builder.UseXminAsConcurrencyToken();
+        builder.Property(j => j.Id).ValueGeneratedNever();
+        builder.Property(j => j.RowVersion).IsConcurrencyToken();
 
         builder.Property(j => j.SourceLanguage).HasMaxLength(10);
         builder.Property(j => j.AudioLanguage).HasMaxLength(10).IsRequired();

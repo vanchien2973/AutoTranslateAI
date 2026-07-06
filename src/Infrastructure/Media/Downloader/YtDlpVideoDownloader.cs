@@ -2,6 +2,7 @@ using Application.Dtos;
 using Application.Interfaces;
 using CliWrap;
 using CliWrap.Buffered;
+using CliWrap.Builders;
 using Infrastructure.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -28,6 +29,7 @@ public sealed class YtDlpVideoDownloader : IVideoDownloader
 
         var result = await Cli.Wrap(_tools.YtDlpPath)
             .WithArguments(arguments)
+            .WithEnvironmentVariables(DropBrokenCertBundles)
             .WithValidation(CommandResultValidation.None)
             .ExecuteBufferedAsync(cancellationToken);
 
@@ -42,5 +44,19 @@ public sealed class YtDlpVideoDownloader : IVideoDownloader
                 $"yt-dlp did not report an output file for '{request.Url}'.");
 
         return new DownloadResult(filePath, Title: null, DurationSeconds: null);
+    }
+
+    private static readonly string[] CertBundleVariables = ["CURL_CA_BUNDLE", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE"];
+
+    private static void DropBrokenCertBundles(EnvironmentVariablesBuilder environment)
+    {
+        foreach (var name in CertBundleVariables)
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            if (!string.IsNullOrEmpty(value) && !File.Exists(value))
+            {
+                environment.Set(name, null);
+            }
+        }
     }
 }

@@ -1,8 +1,12 @@
-using Application.Interfaces;
-using Application.Messaging;
-using Domain.Entities;
-using Domain.Exceptions;
-using MassTransit;
+using Application.Enums;
+using Application.Features.Jobs.CancelJob;
+using Application.Features.Jobs.ConfirmJob;
+using Application.Features.Jobs.CreateJob;
+using Application.Features.Jobs.GetJobDownload;
+using Application.Features.Jobs.GetJobs;
+using Application.Features.Jobs.GetJobStatus;
+using Application.Features.Jobs.ReopenJob;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
@@ -11,77 +15,72 @@ namespace Api.Controllers;
 [Route("api/[controller]")]
 public sealed class JobsController : ControllerBase
 {
-    private readonly IPublishEndpoint _publishEndpoint;
-    private readonly IDubbingJobRepository _jobs;
+    private readonly IMediator _mediator;
 
-    public JobsController(IPublishEndpoint publishEndpoint, IDubbingJobRepository jobs)
+    public JobsController(IMediator mediator) => _mediator = mediator;
+
+    [HttpGet]
+    public async Task<IActionResult> List(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
     {
-        _publishEndpoint = publishEndpoint;
-        _jobs = jobs;
+        var response = await _mediator.Send(new GetJobsQuery(page, pageSize), cancellationToken);
+        return Ok(response.Jobs);
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> Get(Guid id, CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(new GetJobStatusQuery(id), cancellationToken);
+        return response.Status == OperationStatus.NotFound ? NotFound() : Ok(response.Job);
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateJobRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Create([FromBody] CreateJobCommand command, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.SourceUrl))
+        var response = await _mediator.Send(command, cancellationToken);
+        return Accepted(new { jobId = response.JobId });
+    }
+
+    [HttpGet("{id:guid}/download")]
+    public async Task<IActionResult> Download(Guid id, CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(new GetJobDownloadQuery(id), cancellationToken);
+        return response.Status switch
         {
-            return BadRequest("SourceUrl is required.");
-        }
-
-        var audioLanguage = string.IsNullOrWhiteSpace(request.AudioLanguage) ? "vi" : request.AudioLanguage;
-        var subtitleLanguage = string.IsNullOrWhiteSpace(request.SubtitleLanguage) ? audioLanguage : request.SubtitleLanguage;
-        var enableDubbing = request.EnableDubbing ?? true;
-
-        // Persist the job first so JobSteps have a parent row and resume/tracking works from the first run.
-        var job = new DubbingJob(
-            sourceUrl: request.SourceUrl,
-            localFilePath: null,
-            sourceLanguage: null,
-            audioLanguage: audioLanguage,
-            subtitleLanguage: subtitleLanguage,
-            enableDubbing: enableDubbing);
-        await _jobs.AddAsync(job, cancellationToken);
-
-        await _publishEndpoint.Publish(
-            new DubbingJobRequested(job.Id, request.SourceUrl, audioLanguage, subtitleLanguage, enableDubbing),
-            cancellationToken);
-
-        return Accepted(new { jobId = job.Id });
+            OperationStatus.Ok => Ok(new { url = response.Url, expiresInSeconds = response.ExpiresInSeconds }),
+            OperationStatus.NotFound => NotFound(),
+            OperationStatus.Conflict => Conflict(response.Error),
+            _ => StatusCode(StatusCodes.Status500InternalServerError),
+        };
     }
 
     [HttpPost("{id:guid}/confirm")]
     public Task<IActionResult> Confirm(Guid id, CancellationToken cancellationToken) =>
-        TransitionAsync(id, job => job.Confirm(), cancellationToken);
+        TransitionAsync(new ConfirmJobCommand(id), response => (response.Status, response.JobId, response.JobStatus, response.Error), cancellationToken);
 
     [HttpPost("{id:guid}/cancel")]
     public Task<IActionResult> Cancel(Guid id, CancellationToken cancellationToken) =>
-        TransitionAsync(id, job => job.Cancel(), cancellationToken);
+        TransitionAsync(new CancelJobCommand(id), response => (response.Status, response.JobId, response.JobStatus, response.Error), cancellationToken);
 
-    // Loads the job, applies a state-machine transition, and saves with xmin optimistic concurrency.
-    private async Task<IActionResult> TransitionAsync(Guid id, Action<DubbingJob> transition, CancellationToken cancellationToken)
+    [HttpPost("{id:guid}/reopen")]
+    public Task<IActionResult> Reopen(Guid id, CancellationToken cancellationToken) =>
+        TransitionAsync(new ReopenJobCommand(id), response => (response.Status, response.JobId, response.JobStatus, response.Error), cancellationToken);
+
+    // Confirm/Cancel/Reopen share the same HTTP mapping over their (Status, JobId, JobStatus, Error) shape.
+    private async Task<IActionResult> TransitionAsync<TResponse>(
+        IRequest<TResponse> command,
+        Func<TResponse, (OperationStatus Status, Guid JobId, string? JobStatus, string? Error)> project,
+        CancellationToken cancellationToken)
     {
-        var job = await _jobs.GetAsync(id, cancellationToken);
-        if (job is null)
+        var (status, jobId, jobStatus, error) = project(await _mediator.Send(command, cancellationToken));
+        return status switch
         {
-            return NotFound();
-        }
-
-        try
-        {
-            transition(job);
-            await _jobs.SaveChangesAsync(cancellationToken);
-        }
-        catch (InvalidStateTransitionException ex)
-        {
-            return Conflict(ex.Message);
-        }
-
-        return Ok(new { jobId = job.Id, status = job.Status.ToString() });
+            OperationStatus.Ok => Ok(new { jobId, status = jobStatus }),
+            OperationStatus.NotFound => NotFound(),
+            OperationStatus.Conflict => Conflict(error),
+            _ => StatusCode(StatusCodes.Status500InternalServerError),
+        };
     }
 }
-
-public sealed record CreateJobRequest(
-    string SourceUrl,
-    string? AudioLanguage,
-    string? SubtitleLanguage,
-    bool? EnableDubbing);

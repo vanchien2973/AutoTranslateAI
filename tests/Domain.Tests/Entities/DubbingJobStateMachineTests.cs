@@ -250,4 +250,92 @@ public class DubbingJobStateMachineTests
         // Assert
         act.Should().Throw<InvalidStateTransitionException>();
     }
+
+    [Fact]
+    public void Given_ConfirmedQueued_When_BeginPhase2Processing_Then_MovesToProcessingPhase2()
+    {
+        // Arrange
+        var job = JobIn(JobStatus.ConfirmedQueued);
+
+        // Act
+        job.BeginPhase2Processing();
+
+        // Assert
+        job.Status.Should().Be(JobStatus.ProcessingPhase2);
+    }
+
+    [Fact]
+    public void Given_AlreadyProcessingPhase2_When_BeginPhase2Processing_Then_StaysWithoutThrowing()
+    {
+        // Arrange
+        var job = JobIn(JobStatus.ProcessingPhase2);
+
+        // Act
+        var act = () => job.BeginPhase2Processing();
+
+        // Assert
+        act.Should().NotThrow();
+        job.Status.Should().Be(JobStatus.ProcessingPhase2);
+    }
+
+    [Fact]
+    public void Given_AwaitingReview_When_BeginPhase2Processing_Then_ThrowsInvalidStateTransition()
+    {
+        // Arrange
+        var job = JobIn(JobStatus.AwaitingReview);
+
+        // Act
+        var act = () => job.BeginPhase2Processing();
+
+        // Assert
+        act.Should().Throw<InvalidStateTransitionException>();
+    }
+
+    [Fact]
+    public void Given_CompletedJob_When_ReopenForReview_Then_MovesToAwaitingReviewAndClearsOutput()
+    {
+        // Arrange
+        var job = JobIn(JobStatus.Completed);
+
+        // Act
+        job.ReopenForReview();
+
+        // Assert
+        job.Status.Should().Be(JobStatus.AwaitingReview);
+        job.OutputFilePath.Should().BeNull();
+        job.CompletedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void Given_CompletedJobWithSteps_When_ReopenForReview_Then_ResetsPhase2StepsButKeepsPhase1()
+    {
+        // Arrange
+        var job = JobIn(JobStatus.Completed);
+        var phase1 = job.GetOrCreateStep(StepType.Transcribe, phase: 1);
+        phase1.Start();
+        phase1.Complete();
+        var phase2 = job.GetOrCreateStep(StepType.Tts, phase: 2);
+        phase2.Start();
+        phase2.Complete();
+
+        // Act
+        job.ReopenForReview();
+
+        // Assert
+        phase1.Status.Should().Be(JobStepStatus.Completed); // Phase 1 not re-run
+        phase2.Status.Should().Be(JobStepStatus.Pending);   // Phase 2 will re-run
+    }
+
+    [Fact]
+    public void Given_ProcessingPhase1Job_When_ReopenForReview_Then_ThrowsInvalidStateTransition()
+    {
+        // Arrange
+        var job = JobIn(JobStatus.ProcessingPhase1);
+
+        // Act
+        var act = () => job.ReopenForReview();
+
+        // Assert
+        act.Should().Throw<InvalidStateTransitionException>();
+    }
 }

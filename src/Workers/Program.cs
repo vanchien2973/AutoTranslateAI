@@ -23,7 +23,8 @@ try
 
     builder.Services.AddApplication();
     // Register the MassTransit consumer from this assembly so the Worker actually processes jobs.
-    builder.Services.AddInfrastructure(builder.Configuration, typeof(DubbingJobConsumer));
+    // Passing one marker registers every consumer in the Workers assembly (Phase1Consumer + Phase2Consumer).
+    builder.Services.AddInfrastructure(builder.Configuration, typeof(Phase1Consumer));
 
     // Pipeline steps, registered in execution order; PipelineRunner resolves IEnumerable<IPipelineStep>
     // and runs them ordered by StepType (Download..Upload) in a single pass for this milestone.

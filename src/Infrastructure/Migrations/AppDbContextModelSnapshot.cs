@@ -69,6 +69,10 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("ReviewReadyAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
                     b.Property<string>("SourceLanguage")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
@@ -100,12 +104,6 @@ namespace Infrastructure.Migrations
 
                     b.Property<string>("WorkspacePath")
                         .HasColumnType("text");
-
-                    b.Property<uint>("xmin")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
 
                     b.HasKey("Id");
 
@@ -196,6 +194,10 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
                     b.Property<int>("SegmentIndex")
                         .HasColumnType("integer");
 
@@ -220,12 +222,6 @@ namespace Infrastructure.Migrations
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<uint>("xmin")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
 
                     b.HasKey("Id");
 
