@@ -20,6 +20,22 @@ public static class SegmentMapping
         NeedsTtsRegenerate = segment.NeedsTtsRegenerate,
     };
 
+    public static SegmentDto ToDto(Segment segment) => new(
+        segment.Id,
+        segment.SegmentIndex,
+        segment.StartTime,
+        segment.EndTime,
+        segment.OriginalText,
+        segment.AudioTextAi,
+        segment.AudioTextEdited,
+        segment.SubtitleTextAi,
+        segment.SubtitleTextEdited,
+        segment.TtsText,
+        segment.SubtitleText,
+        segment.AssignedVoice,
+        segment.IsEdited,
+        segment.NeedsTtsRegenerate);
+
     public static Segment ToDomain(Guid jobId, PipelineSegment segment)
     {
         var entity = new Segment(jobId, segment.Index, segment.StartTime, segment.EndTime, segment.OriginalText);

@@ -27,4 +27,15 @@ public sealed class DubbingJobRepository : IDubbingJobRepository
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) =>
         _dbContext.SaveChangesWithRetryAsync(MaxConcurrencyRetries, cancellationToken);
+
+    public async Task<(IReadOnlyList<DubbingJob> Items, int TotalCount)> ListAsync(
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        var query = _dbContext.DubbingJobs.AsNoTracking().OrderByDescending(job => job.CreatedAt);
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query.Skip(skip).Take(take).ToListAsync(cancellationToken);
+        return (items, total);
+    }
 }

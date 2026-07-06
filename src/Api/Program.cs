@@ -1,5 +1,6 @@
 using Api.Consumers;
 using Api.Extensions;
+using Api.Filters;
 using Api.Hubs;
 using Application;
 using Infrastructure;
@@ -36,7 +37,7 @@ try
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials()));
-    builder.Services.AddControllers();
+    builder.Services.AddControllers(options => options.Filters.Add<ValidationExceptionFilter>());
     builder.Services.AddSignalR();
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration, typeof(JobProgressConsumer));

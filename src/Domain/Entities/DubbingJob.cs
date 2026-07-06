@@ -156,6 +156,12 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity, IVersioned
     /// </summary>
     public void ReopenForReview()
     {
+        // Reopen is only meaningful for a finished job; the Phase-1 -> AwaitingReview path is MarkAwaitingReview.
+        if (Status != JobStatus.Completed)
+        {
+            throw new InvalidStateTransitionException(nameof(DubbingJob), Status, JobStatus.AwaitingReview);
+        }
+
         TransitionTo(JobStatus.AwaitingReview);
 
         foreach (var step in _steps.Where(step => step.Phase == 2))
@@ -264,6 +270,34 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity, IVersioned
         var step = new JobStep(Id, stepType, phase);
         _steps.Add(step);
         return step;
+    }
+
+    /// <summary>
+    /// Adjust timing for 1 segment; aggregate root maintains invariance across segments: no overlapping of the preceding/following segment.
+    /// </summary>
+    public void AdjustSegmentTiming(Guid segmentId, double startTime, double endTime)
+    {
+        var ordered = _segments.OrderBy(segment => segment.SegmentIndex).ToList();
+        var position = ordered.FindIndex(segment => segment.Id == segmentId);
+        if (position < 0)
+        {
+            throw new BusinessRuleViolationException($"Segment {segmentId} does not belong to this job.");
+        }
+
+        var previousEnd = position > 0 ? ordered[position - 1].EndTime : 0.0;
+        if (startTime < previousEnd)
+        {
+            throw new BusinessRuleViolationException("Segment start overlaps the previous segment.");
+        }
+
+        if (position < ordered.Count - 1 && endTime > ordered[position + 1].StartTime)
+        {
+            throw new BusinessRuleViolationException("Segment end overlaps the next segment.");
+        }
+
+        // Segment enforces its own start<end / non-negative invariant.
+        ordered[position].AdjustTiming(startTime, endTime);
+        Touch();
     }
 
     // Central guard: validates the requested transition against AllowedTransitions before applying it.

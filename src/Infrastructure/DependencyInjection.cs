@@ -1,7 +1,9 @@
 using Application.Interfaces;
+using Infrastructure.AI.Review;
 using Infrastructure.AI.SpeechToText;
 using Infrastructure.AI.TextToSpeech;
 using Infrastructure.AI.Translation;
+using Infrastructure.Review;
 using Infrastructure.Configuration;
 using Infrastructure.HealthChecks;
 using Infrastructure.Messaging;
@@ -114,6 +116,16 @@ public static class DependencyInjection
             var other => throw new InvalidOperationException($"Unknown Translation provider: '{other}'"),
         });
 
+        // Synchronous chat completion (review assistant) — shares the Translation provider selection.
+        services.AddSingleton<ILlmCompletionService>(sp => providers.Translation switch
+        {
+            "OpenAI" => ActivatorUtilities.CreateInstance<OpenAiChatCompletionService>(sp),
+            var other => throw new InvalidOperationException($"Unknown Translation provider: '{other}'"),
+        });
+
+        // Review chat history + pending proposals live in memory (single local instance).
+        services.AddSingleton<IReviewSessionStore, InMemoryReviewSessionStore>();
+
         // Text-to-speech provider.
         services.AddSingleton<ITtsService>(sp => providers.Tts switch
         {
@@ -176,6 +188,9 @@ public static class DependencyInjection
 
         // Progress emission (Worker publishes JobProgressUpdated; API consumes → SignalR).
         services.AddScoped<IProgressNotifier, MassTransitProgressNotifier>();
+
+        // Integration-event publishing behind an Application interface (keeps MassTransit out of handlers).
+        services.AddScoped<IEventPublisher, MassTransitEventPublisher>();
 
         return services;
     }

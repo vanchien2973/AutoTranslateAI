@@ -15,4 +15,20 @@ public static class RateFactorCalculator
         var factor = naturalDurationSeconds / targetDurationSeconds;
         return Math.Clamp(factor, MinFactor, MaxFactor);
     }
+
+    public static TtsTiming Fit(double start, double end, double naturalDurationSeconds, double nextStart)
+    {
+        var borrowedEnd = end;
+        var window = end - start;
+
+        // Only borrow when the natural speech overflows the slot (the "too fast" case).
+        if (naturalDurationSeconds > window)
+        {
+            var needed = naturalDurationSeconds - window;
+            var gap = Math.Max(0.0, nextStart - end);
+            borrowedEnd = end + Math.Min(needed, gap);
+        }
+
+        return new TtsTiming(start, borrowedEnd, Compute(naturalDurationSeconds, borrowedEnd - start));
+    }
 }

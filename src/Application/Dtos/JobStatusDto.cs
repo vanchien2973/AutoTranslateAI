@@ -1,11 +1,5 @@
 namespace Application.Dtos;
 
-public sealed record CreateJobRequest(
-    string SourceUrl,
-    string? AudioLanguage,
-    string? SubtitleLanguage,
-    bool? EnableDubbing);
-
 public sealed record JobStatusDto(
     Guid Id,
     string Status,
@@ -22,11 +16,3 @@ public sealed record JobStatusDto(
     DateTimeOffset? ConfirmedAt,
     DateTimeOffset? CompletedAt,
     IReadOnlyList<JobStepDto> Steps);
-
-public sealed record JobStepDto(
-    string StepType,
-    string Status,
-    int Phase,
-    long? DurationMs,
-    int RetryCount,
-    string? ErrorMessage);

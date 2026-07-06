@@ -48,8 +48,10 @@ public sealed class TtsStep : IPipelineStep
         var synthesized = 0;
         var reused = 0;
         var clips = new List<TimelineClip>();
-        foreach (var segment in context.Segments)
+        var ordered = context.Segments.OrderBy(segment => segment.StartTime).ToList();
+        for (var i = 0; i < ordered.Count; i++)
         {
+            var segment = ordered[i];
             var text = SegmentText.ForTts(segment);
             if (string.IsNullOrWhiteSpace(text))
             {
@@ -77,11 +79,13 @@ public sealed class TtsStep : IPipelineStep
                 cancellationToken);
             var durationMs = natural.DurationMs;
 
-            var rateFactor = RateFactorCalculator.Compute(natural.DurationMs / 1000.0, segment.DurationSeconds);
-            if (Math.Abs(rateFactor - 1.0) > RateTolerance)
+            // Borrow trailing silence up to the next segment's start so long speech isn't over-compressed.
+            var nextStart = i < ordered.Count - 1 ? ordered[i + 1].StartTime : double.PositiveInfinity;
+            var timing = RateFactorCalculator.Fit(segment.StartTime, segment.EndTime, natural.DurationMs / 1000.0, nextStart);
+            if (Math.Abs(timing.RateFactor - 1.0) > RateTolerance)
             {
                 var adjusted = await _tts.SynthesizeAsync(
-                    new TtsRequest(text, context.AudioLanguage, gender, segment.AssignedVoice, rateFactor, outputPath),
+                    new TtsRequest(text, context.AudioLanguage, gender, segment.AssignedVoice, timing.RateFactor, outputPath),
                     cancellationToken);
                 durationMs = adjusted.DurationMs;
             }

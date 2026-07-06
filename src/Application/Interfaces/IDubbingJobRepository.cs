@@ -9,4 +9,6 @@ public interface IDubbingJobRepository
     Task AddAsync(DubbingJob job, CancellationToken cancellationToken);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);
+
+    Task<(IReadOnlyList<DubbingJob> Items, int TotalCount)> ListAsync(int skip, int take, CancellationToken cancellationToken);
 }
