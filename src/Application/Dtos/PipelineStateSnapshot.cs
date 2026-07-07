@@ -12,6 +12,7 @@ public sealed class PipelineStateSnapshot
     public string? BackgroundMusicPath { get; set; }
     public string? DubbedVocalsPath { get; set; }
     public string? MixedAudioPath { get; set; }
+    public string? SubtitlePath { get; set; }
     public string? OutputVideoPath { get; set; }
     public string? OutputStorageKey { get; set; }
     public string? OutputUrl { get; set; }
@@ -26,6 +27,7 @@ public sealed class PipelineStateSnapshot
         BackgroundMusicPath = context.BackgroundMusicPath,
         DubbedVocalsPath = context.DubbedVocalsPath,
         MixedAudioPath = context.MixedAudioPath,
+        SubtitlePath = context.SubtitlePath,
         OutputVideoPath = context.OutputVideoPath,
         OutputStorageKey = context.OutputStorageKey,
         OutputUrl = context.OutputUrl,
@@ -42,6 +44,7 @@ public sealed class PipelineStateSnapshot
         context.BackgroundMusicPath = BackgroundMusicPath;
         context.DubbedVocalsPath = DubbedVocalsPath;
         context.MixedAudioPath = MixedAudioPath;
+        context.SubtitlePath = SubtitlePath;
         context.OutputVideoPath = OutputVideoPath;
         context.OutputStorageKey = OutputStorageKey;
         context.OutputUrl = OutputUrl;

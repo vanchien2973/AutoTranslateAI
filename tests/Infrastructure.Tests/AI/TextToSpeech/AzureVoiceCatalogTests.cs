@@ -1,5 +1,5 @@
-using Domain.Enums;
 using Infrastructure.AI.TextToSpeech;
+using Shared.Enums;
 
 namespace Infrastructure.Tests.AI.TextToSpeech;
 

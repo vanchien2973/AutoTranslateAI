@@ -1,5 +1,5 @@
 using Application.Dtos;
-using Domain.Enums;
+using Shared.Enums;
 
 namespace Infrastructure.AI.TextToSpeech;
 
@@ -16,6 +16,10 @@ internal static class AzureVoiceCatalog
             ["fr"] = ("fr-FR-DeniseNeural", "fr-FR-HenriNeural"),
             ["es"] = ("es-ES-ElviraNeural", "es-ES-AlvaroNeural"),
         };
+
+    public static readonly IReadOnlyCollection<string> Languages = Defaults.Keys.ToArray();
+
+    public static bool Supports(string languageCode) => TryGetPair(languageCode, out _);
 
     public static string ResolveVoice(string languageCode, VoiceGender gender)
     {

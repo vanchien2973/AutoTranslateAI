@@ -1,7 +1,9 @@
 using Application.Interfaces;
 using Application.Messaging;
 using Domain.Entities;
+using Domain.Enums;
 using MediatR;
+using Shared.Enums;
 
 namespace Application.Features.Jobs.CreateJob;
 
@@ -21,6 +23,8 @@ public sealed class CreateJobCommandHandler : IRequestHandler<CreateJobCommand, 
         var audioLanguage = string.IsNullOrWhiteSpace(request.AudioLanguage) ? "vi" : request.AudioLanguage;
         var subtitleLanguage = string.IsNullOrWhiteSpace(request.SubtitleLanguage) ? audioLanguage : request.SubtitleLanguage;
         var enableDubbing = request.EnableDubbing ?? true;
+        var voiceGender = request.VoiceGender ?? VoiceGender.Female;
+        var subtitleMode = request.SubtitleMode ?? SubtitleMode.Softsub;
 
         // Persist the job first so JobSteps have a parent row and resume/tracking works from the first run.
         var job = new DubbingJob(
@@ -29,7 +33,9 @@ public sealed class CreateJobCommandHandler : IRequestHandler<CreateJobCommand, 
             sourceLanguage: null,
             audioLanguage: audioLanguage,
             subtitleLanguage: subtitleLanguage,
-            enableDubbing: enableDubbing);
+            enableDubbing: enableDubbing,
+            voiceGender: voiceGender,
+            subtitleMode: subtitleMode);
         await _jobs.AddAsync(job, cancellationToken);
 
         await _events.PublishAsync(

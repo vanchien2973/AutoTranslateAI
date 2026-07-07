@@ -34,6 +34,7 @@ try
     builder.Services.AddTransient<IPipelineStep, TranscribeStep>();
     builder.Services.AddTransient<IPipelineStep, TranslateStep>();
     builder.Services.AddTransient<IPipelineStep, TtsStep>();
+    builder.Services.AddTransient<IPipelineStep, GenSubtitleStep>();
     builder.Services.AddTransient<IPipelineStep, MixStep>();
     builder.Services.AddTransient<IPipelineStep, RenderStep>();
     builder.Services.AddTransient<IPipelineStep, UploadStep>();

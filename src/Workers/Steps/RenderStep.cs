@@ -5,7 +5,7 @@ using Domain.Enums;
 
 namespace Workers.Steps;
 
-/// <summary>Step 8: Combine the original video with the new audio track (with added voiceover/mixing) to create the output file.</summary>
+/// <summary>Step 9: Combine the original video with the new audio track (with added voiceover/mixing) to create the output file.</summary>
 public sealed class RenderStep : IPipelineStep
 {
     private readonly IVideoRenderer _renderer;
@@ -27,14 +27,15 @@ public sealed class RenderStep : IPipelineStep
         }
 
         var audioPath = context.MixedAudioPath ?? context.DubbedVocalsPath;
-        if (string.IsNullOrEmpty(audioPath))
+        if (string.IsNullOrEmpty(audioPath) && context.EnableDubbing)
         {
-            return StepResult.Fail("No audio track available to render.");
+            return StepResult.Fail("Dubbing is enabled but no dubbed audio track was produced.");
         }
 
         var outputPath = _workspace.GetArtifactPath(context.JobId, "output.mp4");
         context.OutputVideoPath = await _renderer.RenderAsync(
-            new RenderRequest(context.SourceVideoPath, audioPath, outputPath), cancellationToken);
+            new RenderRequest(context.SourceVideoPath, audioPath, outputPath, context.SubtitleMode, context.SubtitlePath),
+            cancellationToken);
 
         return StepResult.Success();
     }

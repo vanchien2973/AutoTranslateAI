@@ -5,7 +5,7 @@ using Domain.Enums;
 
 namespace Workers.Steps;
 
-/// <summary>Step 7: Mix the blended voiceover with the background music (ducking) to create the final audio track.</summary>
+/// <summary>Step 8: Mix the blended voiceover with the background music (ducking) to create the final audio track.</summary>
 public sealed class MixStep : IPipelineStep
 {
     private readonly IAudioMixer _mixer;

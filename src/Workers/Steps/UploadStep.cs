@@ -4,7 +4,7 @@ using Domain.Enums;
 
 namespace Workers.Steps;
 
-/// <summary>Step 9: Upload the output file to storage (R2) and save the URL/key.</summary>
+/// <summary>Step 10: Upload the output file to storage (R2) and save the URL/key.</summary>
 public sealed class UploadStep : IPipelineStep
 {
     private readonly IStorageService _storage;
