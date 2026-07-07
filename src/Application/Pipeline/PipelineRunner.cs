@@ -39,6 +39,7 @@ public sealed class PipelineRunner
             SubtitleLanguage = request.SubtitleLanguage,
             EnableDubbing = request.EnableDubbing,
             DefaultVoiceGender = request.DefaultVoiceGender,
+            SubtitleMode = request.SubtitleMode,
         };
 
         // Resume: rehydrate artifacts/segments from the last snapshot and learn which steps already finished.

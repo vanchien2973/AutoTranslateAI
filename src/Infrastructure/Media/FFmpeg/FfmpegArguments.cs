@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Text;
-using Application.Dtos;
+using Domain.Enums;
 
 namespace Infrastructure.Media.FFmpeg;
 
@@ -71,16 +71,66 @@ internal static class FfmpegArguments
         ];
     }
 
-    public static IReadOnlyList<string> BuildRender(RenderRequest request) =>
-    [
-        "-y",
-        "-i", request.VideoPath,
-        "-i", request.AudioPath,
-        "-map", "0:v:0",               // video from the source
-        "-map", "1:a:0",               // audio from the new (dubbed/mixed) track
-        "-c:v", "copy",                // keep video as-is (no re-encode)
-        "-c:a", "aac",
-        "-shortest",
-        request.OutputPath,
-    ];
+    public static IReadOnlyList<string> BuildRender(RenderRequest request)
+    {
+        var hasSubtitle = !string.IsNullOrWhiteSpace(request.SubtitlePath);
+        var softsub = request.SubtitleMode == SubtitleMode.Softsub && hasSubtitle;
+        var hardsub = request.SubtitleMode == SubtitleMode.Hardsub && hasSubtitle;
+        var hasNewAudio = !string.IsNullOrWhiteSpace(request.AudioPath);
+
+        var args = new List<string> { "-y", "-i", request.VideoPath };
+
+        if (hasNewAudio)
+        {
+            args.Add("-i");
+            args.Add(request.AudioPath!);
+        }
+
+        if (softsub)
+        {
+            args.Add("-i");
+            args.Add(request.SubtitlePath!);
+        }
+
+        args.Add("-map");
+        args.Add("0:v:0");             // video from the source
+        args.Add("-map");
+        args.Add(hasNewAudio ? "1:a:0" : "0:a:0?");   // new dubbed/mixed track, else keep the source audio
+        if (softsub)
+        {
+            // The subtitle is the last input: index 2 when there's a new audio track, otherwise 1.
+            args.Add("-map");
+            args.Add(hasNewAudio ? "2:s:0" : "1:s:0");
+        }
+
+        if (hardsub)
+        {
+            // Burn subtitles into the picture; this re-encodes the video stream.
+            args.Add("-vf");
+            args.Add($"subtitles={EscapeSubtitlePath(request.SubtitlePath!)}");
+        }
+        else
+        {
+            args.Add("-c:v");
+            args.Add("copy");          // keep video as-is (no re-encode)
+        }
+
+        args.Add("-c:a");
+        args.Add(hasNewAudio ? "aac" : "copy");   // re-encode the dubbed track; copy the untouched source audio
+        if (softsub)
+        {
+            args.Add("-c:s");
+            args.Add("mov_text");      // MP4-compatible soft subtitle codec
+        }
+
+        args.Add("-shortest");
+        args.Add(request.OutputPath);
+        return args;
+    }
+
+    private static string EscapeSubtitlePath(string path)
+    {
+        var normalized = path.Replace('\\', '/').Replace(":", "\\:");
+        return $"'{normalized}'";
+    }
 }

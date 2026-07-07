@@ -1,3 +1,5 @@
+using Application.Enums;
+using Application.Helpers;
 using Application.Interfaces;
 using Application.Pipeline;
 using Domain.Enums;
@@ -23,19 +25,47 @@ public sealed class TranslateStep : IPipelineStep
             return StepResult.Skip("No segments to translate.");
         }
 
-        var sourceLanguage = context.SourceLanguage ?? "auto";
-        if (string.Equals(sourceLanguage, context.AudioLanguage, StringComparison.OrdinalIgnoreCase))
+        var plan = TranslationPlanner.Plan(
+            context.SourceLanguage, context.AudioLanguage, context.SubtitleLanguage, context.EnableDubbing);
+
+        if (plan.TranslationCalls == 0)
         {
-            return StepResult.Skip("Audio language equals source language; using original text.");
+            return StepResult.Skip("No translation needed for this language combination.");
         }
 
+        var sourceLanguage = context.SourceLanguage ?? "auto";
         var texts = context.Segments.Select(segment => segment.OriginalText).ToList();
-        var translated = await _translation.TranslateBatchAsync(
-            texts, sourceLanguage, context.AudioLanguage, cancellationToken);
 
-        for (var i = 0; i < context.Segments.Count; i++)
+        if (plan.TranslateAudio)
         {
-            context.Segments[i].AudioTextAi = translated[i];
+            var audio = await _translation.TranslateBatchAsync(texts, sourceLanguage, context.AudioLanguage, cancellationToken);
+            for (var i = 0; i < context.Segments.Count; i++)
+            {
+                context.Segments[i].AudioTextAi = audio[i];
+            }
+        }
+
+        switch (plan.Subtitle)
+        {
+            case SubtitleSource.Translate:
+                var subtitle = await _translation.TranslateBatchAsync(
+                    texts, sourceLanguage, context.SubtitleLanguage!, cancellationToken);
+                for (var i = 0; i < context.Segments.Count; i++)
+                {
+                    context.Segments[i].SubtitleTextAi = subtitle[i];
+                }
+
+                break;
+
+            case SubtitleSource.Original when plan.TranslateAudio:
+                // Audio is dubbed but the subtitle stays in the source language: pin it to the original so it
+                // doesn't fall back to the audio translation via the COALESCE resolution.
+                foreach (var segment in context.Segments)
+                {
+                    segment.SubtitleTextAi = segment.OriginalText;
+                }
+
+                break;
         }
 
         return StepResult.Success();

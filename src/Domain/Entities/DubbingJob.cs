@@ -1,6 +1,7 @@
 using Domain.Common;
 using Domain.Enums;
 using Domain.Exceptions;
+using Shared.Enums;
 
 namespace Domain.Entities;
 

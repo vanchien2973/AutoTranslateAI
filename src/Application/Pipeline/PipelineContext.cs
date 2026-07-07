@@ -1,4 +1,5 @@
 using Domain.Enums;
+using Shared.Enums;
 
 namespace Application.Pipeline;
 
@@ -11,7 +12,9 @@ public sealed class PipelineContext
     public required string SubtitleLanguage { get; init; }
     public bool EnableDubbing { get; init; } = true;
     public VoiceGender DefaultVoiceGender { get; init; } = VoiceGender.Female;
+    public SubtitleMode SubtitleMode { get; init; } = SubtitleMode.None;
     public string? SourceLanguage { get; set; }
+    public string? SubtitlePath { get; set; }
     public List<PipelineSegment> Segments { get; } = [];
     public string? SourceVideoPath { get; set; }
     public string? AudioPath { get; set; }

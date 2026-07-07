@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace Workers.Steps;
 
 /// <summary>
-/// Step 6: Create voiceovers for each segment and then combine them according to the timestamp to form a single track. Each 
+/// Step 7: Create voiceovers for each segment and then combine them according to the timestamp to form a single track. Each 
 /// segment is read aloud at a natural speed, its length is measured, and then read again with a rate-factor to match the original timeframe.
 /// </summary>
 public sealed class TtsStep : IPipelineStep

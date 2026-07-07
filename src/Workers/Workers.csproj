@@ -15,7 +15,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Jobs\" />
     <Folder Include="Steps\" />
   </ItemGroup>
 

@@ -66,6 +66,10 @@ public sealed class AzureTtsService : ITtsService
     public Task<IReadOnlyList<VoiceInfo>> ListVoicesAsync(string languageCode, CancellationToken cancellationToken) =>
         Task.FromResult(AzureVoiceCatalog.ListVoices(languageCode));
 
+    public bool SupportsLanguage(string languageCode) => AzureVoiceCatalog.Supports(languageCode);
+
+    public IReadOnlyCollection<string> SupportedLanguages => AzureVoiceCatalog.Languages;
+
     private SpeechConfig CreateSpeechConfig() =>
         string.IsNullOrWhiteSpace(_options.Endpoint)
             ? SpeechConfig.FromSubscription(_options.SpeechKey, _options.SpeechRegion)

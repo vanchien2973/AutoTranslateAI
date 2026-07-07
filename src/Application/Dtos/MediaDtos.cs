@@ -1,3 +1,5 @@
+using Domain.Enums;
+
 namespace Application.Dtos;
 
 public sealed record DownloadRequest(string Url, string OutputDirectory);
@@ -20,4 +22,9 @@ public sealed record MixRequest(
     string BackgroundMusicPath,
     string OutputPath,
     double BgmGainDb = -12);
-public sealed record RenderRequest(string VideoPath, string AudioPath, string OutputPath);
+public sealed record RenderRequest(
+    string VideoPath,
+    string? AudioPath,
+    string OutputPath,
+    SubtitleMode SubtitleMode = SubtitleMode.None,
+    string? SubtitlePath = null);

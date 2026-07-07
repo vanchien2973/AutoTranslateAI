@@ -66,6 +66,7 @@ public sealed class Phase2Consumer : IConsumer<DubbingJobConfirmed>
                 job.SubtitleLanguage ?? job.AudioLanguage,
                 job.EnableDubbing,
                 job.VoiceGender,
+                job.SubtitleMode,
                 segments);
 
             var result = await _runner.RunAsync(request, PipelinePhase.Phase2, cancellationToken);
