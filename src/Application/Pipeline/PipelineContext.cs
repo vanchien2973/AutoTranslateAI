@@ -13,6 +13,8 @@ public sealed class PipelineContext
     public bool EnableDubbing { get; init; } = true;
     public VoiceGender DefaultVoiceGender { get; init; } = VoiceGender.Female;
     public SubtitleMode SubtitleMode { get; init; } = SubtitleMode.None;
+    public BgmMode BgmMode { get; init; } = BgmMode.DemucsAI;
+    public int DuckingDb { get; init; } = -12;
     public string? SourceLanguage { get; set; }
     public string? SubtitlePath { get; set; }
     public List<PipelineSegment> Segments { get; } = [];

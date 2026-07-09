@@ -1,8 +1,6 @@
 using Application.Interfaces;
-using Application.Pipeline;
 using Domain.Enums;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
 
 namespace Application.Tests.Pipeline;
 

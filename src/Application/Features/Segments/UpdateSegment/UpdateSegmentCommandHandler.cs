@@ -31,7 +31,8 @@ public sealed class UpdateSegmentCommandHandler : IRequestHandler<UpdateSegmentC
             return UpdateSegmentResponse.NotFound();
         }
 
-        SegmentEditApplier.Apply(segment, request.AudioTextEdited, request.SubtitleTextEdited, request.AssignedVoice);
+        SegmentEditApplier.Apply(
+            segment, request.AudioTextEdited, request.SubtitleTextEdited, request.SpeakerLabel, request.AssignedVoice);
         await _jobs.SaveChangesAsync(cancellationToken);
 
         return UpdateSegmentResponse.Ok(SegmentMapping.ToDto(segment));

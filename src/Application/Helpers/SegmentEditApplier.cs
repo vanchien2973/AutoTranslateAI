@@ -4,7 +4,12 @@ namespace Application.Helpers;
 
 public static class SegmentEditApplier
 {
-    public static void Apply(Segment segment, string? audioText, string? subtitleText, string? assignedVoice)
+    public static void Apply(
+        Segment segment,
+        string? audioText,
+        string? subtitleText,
+        string? speakerLabel,
+        string? assignedVoice)
     {
         if (audioText is not null)
         {
@@ -16,9 +21,9 @@ public static class SegmentEditApplier
             segment.EditSubtitleText(subtitleText);
         }
 
-        if (assignedVoice is not null)
+        if (speakerLabel is not null || assignedVoice is not null)
         {
-            segment.AssignVoice(segment.SpeakerLabel, assignedVoice);
+            segment.AssignVoice(speakerLabel ?? segment.SpeakerLabel, assignedVoice ?? segment.AssignedVoice);
         }
     }
 }

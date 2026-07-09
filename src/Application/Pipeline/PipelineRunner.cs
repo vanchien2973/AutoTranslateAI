@@ -40,6 +40,8 @@ public sealed class PipelineRunner
             EnableDubbing = request.EnableDubbing,
             DefaultVoiceGender = request.DefaultVoiceGender,
             SubtitleMode = request.SubtitleMode,
+            BgmMode = request.BgmMode,
+            DuckingDb = request.DuckingDb,
         };
 
         // Resume: rehydrate artifacts/segments from the last snapshot and learn which steps already finished.

@@ -1,5 +1,4 @@
 using Application.Interfaces;
-using Application.Pipeline;
 using Domain.Entities;
 using Domain.Enums;
 using Infrastructure.Persistence;

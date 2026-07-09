@@ -77,56 +77,114 @@ internal static class FfmpegArguments
         var softsub = request.SubtitleMode == SubtitleMode.Softsub && hasSubtitle;
         var hardsub = request.SubtitleMode == SubtitleMode.Hardsub && hasSubtitle;
         var hasNewAudio = !string.IsNullOrWhiteSpace(request.AudioPath);
+        var hasLogo = !string.IsNullOrWhiteSpace(request.LogoPath);
 
         var args = new List<string> { "-y", "-i", request.VideoPath };
+        var nextInput = 1;
 
+        var audioMap = "0:a:0?";                        // keep the source audio unless a new track is supplied
         if (hasNewAudio)
         {
             args.Add("-i");
             args.Add(request.AudioPath!);
+            audioMap = $"{nextInput++}:a:0";
         }
 
+        var subtitleInput = -1;
         if (softsub)
         {
             args.Add("-i");
             args.Add(request.SubtitlePath!);
+            subtitleInput = nextInput++;
         }
 
-        args.Add("-map");
-        args.Add("0:v:0");             // video from the source
-        args.Add("-map");
-        args.Add(hasNewAudio ? "1:a:0" : "0:a:0?");   // new dubbed/mixed track, else keep the source audio
-        if (softsub)
+        var logoInput = -1;
+        if (hasLogo)
         {
-            // The subtitle is the last input: index 2 when there's a new audio track, otherwise 1.
+            args.Add("-i");
+            args.Add(request.LogoPath!);
+            logoInput = nextInput++;
+        }
+
+        var videoFilter = BuildVideoFilter(request, hardsub, hasLogo, logoInput);
+
+        if (videoFilter is not null)
+        {
+            args.Add("-filter_complex");
+            args.Add(videoFilter);
             args.Add("-map");
-            args.Add(hasNewAudio ? "2:s:0" : "1:s:0");
-        }
-
-        if (hardsub)
-        {
-            // Burn subtitles into the picture; this re-encodes the video stream.
-            args.Add("-vf");
-            args.Add($"subtitles={EscapeSubtitlePath(request.SubtitlePath!)}");
+            args.Add("[v]");
         }
         else
         {
+            args.Add("-map");
+            args.Add("0:v:0");
+        }
+
+        args.Add("-map");
+        args.Add(audioMap);
+        if (softsub)
+        {
+            args.Add("-map");
+            args.Add($"{subtitleInput}:s:0");
+        }
+
+        if (videoFilter is null)
+        {
             args.Add("-c:v");
-            args.Add("copy");          // keep video as-is (no re-encode)
+            args.Add("copy");
         }
 
         args.Add("-c:a");
-        args.Add(hasNewAudio ? "aac" : "copy");   // re-encode the dubbed track; copy the untouched source audio
+        args.Add(hasNewAudio ? "aac" : "copy");
         if (softsub)
         {
             args.Add("-c:s");
-            args.Add("mov_text");      // MP4-compatible soft subtitle codec
+            args.Add("mov_text");
         }
 
         args.Add("-shortest");
         args.Add(request.OutputPath);
         return args;
     }
+
+    private static string? BuildVideoFilter(RenderRequest request, bool hardsub, bool hasLogo, int logoInput)
+    {
+        if (!hardsub && !hasLogo)
+        {
+            return null;
+        }
+
+        var filter = new StringBuilder();
+
+        if (hasLogo)
+        {
+            var scale = request.LogoScalePercent.ToString("0.###", CultureInfo.InvariantCulture);
+            // Scale the logo to a fraction of the video height (aspect-preserving), then overlay at the chosen corner.
+            filter.Append(CultureInfo.InvariantCulture,
+                $"[{logoInput}:v][0:v]scale2ref=w=oh*mdar:h=ih*{scale}[logo][base];[base][logo]overlay={OverlayXy(request.LogoPosition, request.LogoMargin)}");
+        }
+        else
+        {
+            filter.Append("[0:v]");
+        }
+
+        if (hardsub)
+        {
+            filter.Append(CultureInfo.InvariantCulture, $"{(hasLogo ? "," : string.Empty)}subtitles={EscapeSubtitlePath(request.SubtitlePath!)}");
+        }
+
+        filter.Append("[v]");
+        return filter.ToString();
+    }
+
+    private static string OverlayXy(LogoPosition position, int margin) => position switch
+    {
+        LogoPosition.TopLeft => $"{margin}:{margin}",
+        LogoPosition.TopRight => $"W-w-{margin}:{margin}",
+        LogoPosition.BottomLeft => $"{margin}:H-h-{margin}",
+        _ => $"W-w-{margin}:H-h-{margin}",   // BottomRight
+    };
 
     private static string EscapeSubtitlePath(string path)
     {

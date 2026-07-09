@@ -25,6 +25,7 @@ public sealed class CreateJobCommandHandler : IRequestHandler<CreateJobCommand, 
         var enableDubbing = request.EnableDubbing ?? true;
         var voiceGender = request.VoiceGender ?? VoiceGender.Female;
         var subtitleMode = request.SubtitleMode ?? SubtitleMode.Softsub;
+        var bgmMode = request.BgmMode ?? BgmMode.DemucsAI;
 
         // Persist the job first so JobSteps have a parent row and resume/tracking works from the first run.
         var job = new DubbingJob(
@@ -35,6 +36,7 @@ public sealed class CreateJobCommandHandler : IRequestHandler<CreateJobCommand, 
             subtitleLanguage: subtitleLanguage,
             enableDubbing: enableDubbing,
             voiceGender: voiceGender,
+            bgmMode: bgmMode,
             subtitleMode: subtitleMode);
         await _jobs.AddAsync(job, cancellationToken);
 

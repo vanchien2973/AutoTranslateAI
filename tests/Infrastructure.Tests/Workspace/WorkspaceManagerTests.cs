@@ -3,7 +3,6 @@ using Infrastructure.Configuration;
 using Infrastructure.Workspace;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 
 namespace Infrastructure.Tests.Workspace;
 

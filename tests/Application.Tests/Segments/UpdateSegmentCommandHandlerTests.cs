@@ -15,7 +15,7 @@ public class UpdateSegmentCommandHandlerTests
 
         // Act
         var response = await new UpdateSegmentCommandHandler(jobs)
-            .Handle(new UpdateSegmentCommand(Guid.NewGuid(), Guid.NewGuid(), "x", null, null), CancellationToken.None);
+            .Handle(new UpdateSegmentCommand(Guid.NewGuid(), Guid.NewGuid(), "x", null, null, null), CancellationToken.None);
 
         // Assert
         response.Status.Should().Be(OperationStatus.NotFound);
@@ -31,7 +31,7 @@ public class UpdateSegmentCommandHandlerTests
 
         // Act
         var response = await new UpdateSegmentCommandHandler(jobs)
-            .Handle(new UpdateSegmentCommand(job.Id, Guid.NewGuid(), "x", null, null), CancellationToken.None);
+            .Handle(new UpdateSegmentCommand(job.Id, Guid.NewGuid(), "x", null, null, null), CancellationToken.None);
 
         // Assert
         response.Status.Should().Be(OperationStatus.Conflict);
@@ -47,7 +47,7 @@ public class UpdateSegmentCommandHandlerTests
 
         // Act
         var response = await new UpdateSegmentCommandHandler(jobs)
-            .Handle(new UpdateSegmentCommand(job.Id, Guid.NewGuid(), "x", null, null), CancellationToken.None);
+            .Handle(new UpdateSegmentCommand(job.Id, Guid.NewGuid(), "x", null, null, null), CancellationToken.None);
 
         // Assert
         response.Status.Should().Be(OperationStatus.NotFound);
@@ -64,12 +64,31 @@ public class UpdateSegmentCommandHandlerTests
 
         // Act
         var response = await new UpdateSegmentCommandHandler(jobs)
-            .Handle(new UpdateSegmentCommand(job.Id, segment.Id, "changed", null, null), CancellationToken.None);
+            .Handle(new UpdateSegmentCommand(job.Id, segment.Id, "changed", null, null, null), CancellationToken.None);
 
         // Assert
         response.Status.Should().Be(OperationStatus.Ok);
         response.Segment!.AudioTextEdited.Should().Be("changed");
         segment.IsEdited.Should().BeTrue();
         await jobs.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Given_SpeakerAndVoice_When_Handle_Then_AssignsBoth()
+    {
+        // Arrange
+        var segment = TestJobs.Segment(0);
+        var job = TestJobs.AwaitingReview(segment);
+        var jobs = Substitute.For<IDubbingJobRepository>();
+        jobs.GetAsync(job.Id, Arg.Any<CancellationToken>()).Returns(job);
+
+        // Act — manual multi-speaker assignment
+        var response = await new UpdateSegmentCommandHandler(jobs)
+            .Handle(new UpdateSegmentCommand(job.Id, segment.Id, null, null, "Narrator", "vi-VN-NamMinhNeural"), CancellationToken.None);
+
+        // Assert
+        response.Status.Should().Be(OperationStatus.Ok);
+        response.Segment!.SpeakerLabel.Should().Be("Narrator");
+        response.Segment.AssignedVoice.Should().Be("vi-VN-NamMinhNeural");
     }
 }

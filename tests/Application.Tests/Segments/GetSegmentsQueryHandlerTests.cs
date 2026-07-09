@@ -1,4 +1,3 @@
-using Application.Enums;
 using Application.Features.Segments.GetSegments;
 using Application.Interfaces;
 using Domain.Entities;

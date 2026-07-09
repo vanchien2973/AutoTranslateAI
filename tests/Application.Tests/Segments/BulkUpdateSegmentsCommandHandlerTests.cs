@@ -12,7 +12,7 @@ public class BulkUpdateSegmentsCommandHandlerTests
         var job = TestJobs.Queued();
         var jobs = Substitute.For<IDubbingJobRepository>();
         jobs.GetAsync(job.Id, Arg.Any<CancellationToken>()).Returns(job);
-        var command = new BulkUpdateSegmentsCommand(job.Id, new[] { new SegmentEdit(Guid.NewGuid(), "x", null, null) });
+        var command = new BulkUpdateSegmentsCommand(job.Id, new[] { new SegmentEdit(Guid.NewGuid(), "x", null, null, null) });
 
         // Act
         var response = await new BulkUpdateSegmentsCommandHandler(jobs).Handle(command, CancellationToken.None);
@@ -28,7 +28,7 @@ public class BulkUpdateSegmentsCommandHandlerTests
         var job = TestJobs.AwaitingReview(TestJobs.Segment(0));
         var jobs = Substitute.For<IDubbingJobRepository>();
         jobs.GetAsync(job.Id, Arg.Any<CancellationToken>()).Returns(job);
-        var command = new BulkUpdateSegmentsCommand(job.Id, new[] { new SegmentEdit(Guid.NewGuid(), "x", null, null) });
+        var command = new BulkUpdateSegmentsCommand(job.Id, new[] { new SegmentEdit(Guid.NewGuid(), "x", null, null, null) });
 
         // Act
         var response = await new BulkUpdateSegmentsCommandHandler(jobs).Handle(command, CancellationToken.None);
@@ -49,8 +49,8 @@ public class BulkUpdateSegmentsCommandHandlerTests
         jobs.GetAsync(job.Id, Arg.Any<CancellationToken>()).Returns(job);
         var command = new BulkUpdateSegmentsCommand(job.Id, new[]
         {
-            new SegmentEdit(first.Id, "a0", null, null),
-            new SegmentEdit(second.Id, null, "s1", null),
+            new SegmentEdit(first.Id, "a0", null, null, null),
+            new SegmentEdit(second.Id, null, "s1", null, null),
         });
 
         // Act
