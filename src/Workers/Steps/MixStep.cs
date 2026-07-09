@@ -1,6 +1,4 @@
-using Application.Dtos;
 using Application.Interfaces;
-using Application.Pipeline;
 using Domain.Enums;
 
 namespace Workers.Steps;
@@ -26,16 +24,24 @@ public sealed class MixStep : IPipelineStep
             return StepResult.Skip("No dubbed vocals to mix (dubbing disabled or no speech).");
         }
 
-        if (string.IsNullOrEmpty(context.BackgroundMusicPath))
+        var plan = BgmPlanner.Resolve(context.BgmMode, context.DuckingDb);
+        var backgroundPath = plan.Source switch
         {
-            // Nothing to mix against — the dubbed vocals are the final audio track.
+            BgmSource.DuckedOriginal => context.AudioPath,          // original audio, ducked under the dub
+            BgmSource.DemucsAccompaniment => context.BackgroundMusicPath, // demucs-separated music
+            _ => null,                                              // None
+        };
+
+        if (string.IsNullOrEmpty(backgroundPath))
+        {
+            // No background (BGM = None, or the source wasn't produced): dubbed vocals are the final track.
             context.MixedAudioPath = context.DubbedVocalsPath;
-            return StepResult.Skip("No background music; using dubbed vocals as the final track.");
+            return StepResult.Skip($"No background to mix ({context.BgmMode}); using dubbed vocals as the final track.");
         }
 
         var outputPath = _workspace.GetArtifactPath(context.JobId, "mixed.wav");
         context.MixedAudioPath = await _mixer.MixAsync(
-            new MixRequest(context.DubbedVocalsPath, context.BackgroundMusicPath, outputPath), cancellationToken);
+            new MixRequest(context.DubbedVocalsPath, backgroundPath, outputPath, plan.GainDb), cancellationToken);
 
         return StepResult.Success();
     }

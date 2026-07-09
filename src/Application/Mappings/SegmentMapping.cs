@@ -17,6 +17,7 @@ public static class SegmentMapping
         AssignedVoice = segment.AssignedVoice,
         TtsAudioPath = segment.TtsAudioPath,
         TtsDurationMs = segment.TtsDurationMs,
+        TtsVoice = segment.TtsVoice,
         NeedsTtsRegenerate = segment.NeedsTtsRegenerate,
     };
 
@@ -32,6 +33,7 @@ public static class SegmentMapping
         segment.SubtitleTextEdited,
         segment.TtsText,
         segment.SubtitleText,
+        segment.SpeakerLabel,
         segment.AssignedVoice,
         segment.IsEdited,
         segment.NeedsTtsRegenerate);

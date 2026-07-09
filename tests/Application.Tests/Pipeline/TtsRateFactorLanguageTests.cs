@@ -1,7 +1,5 @@
 namespace Application.Tests.Pipeline;
 
-// Different languages expand/contract text differently, so the same source window yields a different
-// natural TTS duration per language. These pin the rate-factor sync behaviour across that range.
 public class TtsRateFactorLanguageTests
 {
     private const double SourceWindow = 3.0;

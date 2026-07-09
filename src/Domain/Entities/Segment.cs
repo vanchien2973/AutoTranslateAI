@@ -33,6 +33,7 @@ public sealed class Segment : BaseEntity, IAuditableEntity, IVersioned
     public string? AssignedVoice { get; private set; }
     public string? TtsAudioPath { get; private set; }
     public long? TtsDurationMs { get; private set; }
+    public string? TtsVoice { get; private set; }
     public bool NeedsTtsRegenerate { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
@@ -87,16 +88,22 @@ public sealed class Segment : BaseEntity, IAuditableEntity, IVersioned
     /// <summary>Assign a specific voice to the segment (multi-speaker / manual assignment).</summary>
     public void AssignVoice(string? speakerLabel, string? voice)
     {
+        if (TtsAudioPath is not null && !string.Equals(voice, AssignedVoice, StringComparison.Ordinal))
+        {
+            NeedsTtsRegenerate = true;
+        }
+
         SpeakerLabel = speakerLabel;
         AssignedVoice = voice;
         Touch();
     }
 
     /// <summary>Save the TTS result of the segment and clear the flag indicating it needs to be regenerated.</summary>
-    public void SetTtsResult(string ttsAudioPath, long ttsDurationMs)
+    public void SetTtsResult(string ttsAudioPath, long ttsDurationMs, string? voice)
     {
         TtsAudioPath = ttsAudioPath;
         TtsDurationMs = ttsDurationMs;
+        TtsVoice = voice;
         NeedsTtsRegenerate = false;
         Touch();
     }

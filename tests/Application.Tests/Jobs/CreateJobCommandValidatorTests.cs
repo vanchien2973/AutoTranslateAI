@@ -17,21 +17,21 @@ public class CreateJobCommandValidatorTests
     public void Given_EmptySourceUrl_When_Validate_Then_IsInvalid()
     {
         ValidatorSupporting("vi")
-            .Validate(new CreateJobCommand("", "vi", "vi", true, null, null)).IsValid.Should().BeFalse();
+            .Validate(new CreateJobCommand("", "vi", "vi", true, null, null, null)).IsValid.Should().BeFalse();
     }
 
     [Fact]
     public void Given_SupportedAudioLanguageWithDubbing_When_Validate_Then_IsValid()
     {
         ValidatorSupporting("vi", "en")
-            .Validate(new CreateJobCommand("https://youtu.be/x", "vi", "vi", true, null, null)).IsValid.Should().BeTrue();
+            .Validate(new CreateJobCommand("https://youtu.be/x", "vi", "vi", true, null, null, null)).IsValid.Should().BeTrue();
     }
 
     [Fact]
     public void Given_UnsupportedAudioLanguageWithDubbing_When_Validate_Then_IsInvalid()
     {
         ValidatorSupporting("vi")
-            .Validate(new CreateJobCommand("https://youtu.be/x", "xx", "vi", true, null, null)).IsValid.Should().BeFalse();
+            .Validate(new CreateJobCommand("https://youtu.be/x", "xx", "vi", true, null, null, null)).IsValid.Should().BeFalse();
     }
 
     [Fact]
@@ -39,7 +39,7 @@ public class CreateJobCommandValidatorTests
     {
         // No dubbing -> no TTS needed, so the audio language is irrelevant.
         ValidatorSupporting("vi")
-            .Validate(new CreateJobCommand("https://youtu.be/x", "xx", "vi", false, null, null)).IsValid.Should().BeTrue();
+            .Validate(new CreateJobCommand("https://youtu.be/x", "xx", "vi", false, null, null, null)).IsValid.Should().BeTrue();
     }
 
     [Fact]
@@ -47,6 +47,6 @@ public class CreateJobCommandValidatorTests
     {
         // Handler defaults a null audio language to a supported one, so validation should not reject it.
         ValidatorSupporting("vi")
-            .Validate(new CreateJobCommand("https://youtu.be/x", null, null, true, null, null)).IsValid.Should().BeTrue();
+            .Validate(new CreateJobCommand("https://youtu.be/x", null, null, true, null, null, null)).IsValid.Should().BeTrue();
     }
 }

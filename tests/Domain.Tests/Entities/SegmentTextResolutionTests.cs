@@ -68,7 +68,7 @@ public class SegmentTextResolutionTests
     {
         // Arrange
         var segment = NewSegment();
-        segment.SetTtsResult(ttsAudioPath: "seg0.wav", ttsDurationMs: 1800);
+        segment.SetTtsResult(ttsAudioPath: "seg0.wav", ttsDurationMs: 1800, voice: null);
 
         // Act
         segment.EditAudioText("bản mới");
@@ -95,11 +95,11 @@ public class SegmentTextResolutionTests
     {
         // Arrange
         var segment = NewSegment();
-        segment.SetTtsResult("seg0.wav", 1800);
+        segment.SetTtsResult("seg0.wav", 1800, null);
         segment.EditAudioText("bản mới");
 
         // Act
-        segment.SetTtsResult("seg0-v2.wav", 2000);
+        segment.SetTtsResult("seg0-v2.wav", 2000, null);
 
         // Assert
         segment.NeedsTtsRegenerate.Should().BeFalse();

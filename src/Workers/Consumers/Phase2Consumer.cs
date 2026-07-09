@@ -67,6 +67,8 @@ public sealed class Phase2Consumer : IConsumer<DubbingJobConfirmed>
                 job.EnableDubbing,
                 job.VoiceGender,
                 job.SubtitleMode,
+                job.BgmMode,
+                job.DuckingDb,
                 segments);
 
             var result = await _runner.RunAsync(request, PipelinePhase.Phase2, cancellationToken);
@@ -77,7 +79,7 @@ public sealed class Phase2Consumer : IConsumer<DubbingJobConfirmed>
             {
                 if (segment.TtsAudioPath is not null && dbSegments.TryGetValue(segment.Index, out var dbSegment))
                 {
-                    dbSegment.SetTtsResult(segment.TtsAudioPath, segment.TtsDurationMs ?? 0);
+                    dbSegment.SetTtsResult(segment.TtsAudioPath, segment.TtsDurationMs ?? 0, segment.TtsVoice);
                 }
             }
 

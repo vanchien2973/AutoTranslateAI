@@ -27,4 +27,8 @@ public sealed record RenderRequest(
     string? AudioPath,
     string OutputPath,
     SubtitleMode SubtitleMode = SubtitleMode.None,
-    string? SubtitlePath = null);
+    string? SubtitlePath = null,
+    string? LogoPath = null,
+    LogoPosition LogoPosition = LogoPosition.BottomRight,
+    double LogoScalePercent = 0.1,
+    int LogoMargin = 16);

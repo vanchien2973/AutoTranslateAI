@@ -10,4 +10,5 @@ public sealed record CreateJobCommand(
     string? SubtitleLanguage,
     bool? EnableDubbing,
     VoiceGender? VoiceGender,
-    SubtitleMode? SubtitleMode) : IRequest<CreateJobResponse>;
+    SubtitleMode? SubtitleMode,
+    BgmMode? BgmMode) : IRequest<CreateJobResponse>;

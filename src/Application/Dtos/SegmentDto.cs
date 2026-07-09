@@ -12,6 +12,7 @@ public sealed record SegmentDto(
     string? SubtitleTextEdited,
     string TtsText,
     string SubtitleText,
+    string? SpeakerLabel,
     string? AssignedVoice,
     bool IsEdited,
     bool NeedsTtsRegenerate);

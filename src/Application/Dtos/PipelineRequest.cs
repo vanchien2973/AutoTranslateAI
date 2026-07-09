@@ -11,4 +11,6 @@ public sealed record PipelineRequest(
     bool EnableDubbing = true,
     VoiceGender DefaultVoiceGender = VoiceGender.Female,
     SubtitleMode SubtitleMode = SubtitleMode.None,
+    BgmMode BgmMode = BgmMode.DemucsAI,
+    int DuckingDb = -12,
     IReadOnlyList<PipelineSegment>? Segments = null);

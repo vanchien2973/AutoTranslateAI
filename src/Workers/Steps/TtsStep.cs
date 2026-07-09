@@ -64,20 +64,25 @@ public sealed class TtsStep : IPipelineStep
             if (!segment.NeedsTtsSynthesis)
             {
                 reused++;
-                _logger.LogInformation("Job {JobId}: TTS reuse seg {Index} (unchanged)", context.JobId, segment.Index);
+                _logger.LogInformation(
+                    "Job {JobId}: TTS reuse seg {Index} (desired={Voice}, clipVoice={ClipVoice}, needsRegen={Regen})",
+                    context.JobId, segment.Index, segment.AssignedVoice ?? "auto", segment.TtsVoice ?? "?", segment.NeedsTtsRegenerate);
                 clips.Add(new TimelineClip(segment.TtsAudioPath!, segment.StartTime));
                 continue;
             }
 
             synthesized++;
-            _logger.LogInformation("Job {JobId}: TTS synth seg {Index}", context.JobId, segment.Index);
             var gender = segment.Gender ?? context.DefaultVoiceGender;
+            _logger.LogInformation(
+                "Job {JobId}: TTS synth seg {Index} (voice={Voice}, gender={Gender})",
+                context.JobId, segment.Index, segment.AssignedVoice ?? "auto", gender);
 
             // First pass at natural speed to measure duration, then re-synthesize to fit the slot.
             var natural = await _tts.SynthesizeAsync(
                 new TtsRequest(text, context.AudioLanguage, gender, segment.AssignedVoice, 1.0, outputPath),
                 cancellationToken);
             var durationMs = natural.DurationMs;
+            var voiceUsed = natural.VoiceUsed;
 
             // Borrow trailing silence up to the next segment's start so long speech isn't over-compressed.
             var nextStart = i < ordered.Count - 1 ? ordered[i + 1].StartTime : double.PositiveInfinity;
@@ -88,10 +93,12 @@ public sealed class TtsStep : IPipelineStep
                     new TtsRequest(text, context.AudioLanguage, gender, segment.AssignedVoice, timing.RateFactor, outputPath),
                     cancellationToken);
                 durationMs = adjusted.DurationMs;
+                voiceUsed = adjusted.VoiceUsed;
             }
 
             segment.TtsAudioPath = outputPath;
             segment.TtsDurationMs = durationMs;
+            segment.TtsVoice = voiceUsed;
             segment.NeedsTtsRegenerate = false;
             clips.Add(new TimelineClip(outputPath, segment.StartTime));
         }
@@ -101,7 +108,10 @@ public sealed class TtsStep : IPipelineStep
             return StepResult.Skip("No segment text to synthesize.");
         }
 
-        _logger.LogInformation("Job {JobId}: TTS synthesized {Synth}, reused {Reused}", context.JobId, synthesized, reused);
+        _logger.LogInformation(
+            "Job {JobId}: TTS synthesized {Synth}, reused {Reused}; distinct voices: [{Voices}]",
+            context.JobId, synthesized, reused,
+            string.Join(", ", context.Segments.Select(segment => segment.AssignedVoice ?? "auto").Distinct()));
 
         var vocalsPath = _workspace.GetArtifactPath(context.JobId, "dubbed_vocals.wav");
         context.DubbedVocalsPath = await _assembler.AssembleAsync(

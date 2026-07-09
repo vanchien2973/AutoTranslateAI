@@ -8,4 +8,5 @@ public sealed record UpdateSegmentCommand(
     [property: JsonIgnore] Guid SegmentId,
     string? AudioTextEdited,
     string? SubtitleTextEdited,
+    string? SpeakerLabel,
     string? AssignedVoice) : IRequest<UpdateSegmentResponse>;

@@ -40,6 +40,7 @@ public static class DependencyInjection
     {
         services.AddValidatedOptions<MediaToolsOptions>(configuration, MediaToolsOptions.SectionName);
         services.AddValidatedOptions<WorkspaceOptions>(configuration, WorkspaceOptions.SectionName);
+        services.AddValidatedOptions<LogoOptions>(configuration, LogoOptions.SectionName);
         services.AddSingleton<IWorkspaceManager, WorkspaceManager>();
         services.AddSingleton<IVideoDownloader, YtDlpVideoDownloader>();
         services.AddSingleton<IAudioExtractor, FfmpegAudioExtractor>();

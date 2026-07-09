@@ -16,12 +16,16 @@ public sealed class PipelineSegment
     public string? AssignedVoice { get; set; }
     public string? TtsAudioPath { get; set; }
     public long? TtsDurationMs { get; set; }
+    public string? TtsVoice { get; set; }   // the voice the current clip was synthesized with
 
     // True if the audio text changed after a TTS clip was made — set when seeding from the DB.
     public bool NeedsTtsRegenerate { get; set; }
 
     public double DurationSeconds => EndTime - StartTime;
 
-    // TTS is (re)synthesized only when there is no clip yet or the audio text changed; otherwise reuse the clip.
-    public bool NeedsTtsSynthesis => NeedsTtsRegenerate || TtsAudioPath is null;
+    // (Re)synthesize when there is no clip, the text changed, or the desired voice no longer matches the clip's voice.
+    public bool NeedsTtsSynthesis =>
+        NeedsTtsRegenerate
+        || TtsAudioPath is null
+        || (AssignedVoice is not null && !string.Equals(AssignedVoice, TtsVoice, StringComparison.Ordinal));
 }

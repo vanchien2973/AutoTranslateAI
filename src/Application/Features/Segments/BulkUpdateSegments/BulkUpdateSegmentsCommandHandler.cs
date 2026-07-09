@@ -33,7 +33,8 @@ public sealed class BulkUpdateSegmentsCommandHandler : IRequestHandler<BulkUpdat
                 return BulkUpdateSegmentsResponse.NotFound($"Segment {edit.SegmentId} not found in job {request.JobId}.");
             }
 
-            SegmentEditApplier.Apply(segment, edit.AudioTextEdited, edit.SubtitleTextEdited, edit.AssignedVoice);
+            SegmentEditApplier.Apply(
+                segment, edit.AudioTextEdited, edit.SubtitleTextEdited, edit.SpeakerLabel, edit.AssignedVoice);
         }
 
         await _jobs.SaveChangesAsync(cancellationToken);

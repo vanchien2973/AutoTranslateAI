@@ -1,5 +1,3 @@
-using Application.Pipeline;
-
 namespace Application.Tests.Pipeline;
 
 public class StepResultTests

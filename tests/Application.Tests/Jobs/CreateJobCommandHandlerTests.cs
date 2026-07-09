@@ -20,7 +20,7 @@ public class CreateJobCommandHandlerTests
         var handler = new CreateJobCommandHandler(jobs, events);
 
         // Act
-        var response = await handler.Handle(new CreateJobCommand("https://youtu.be/x", null, null, null, null, null), CancellationToken.None);
+        var response = await handler.Handle(new CreateJobCommand("https://youtu.be/x", null, null, null, null, null, null), CancellationToken.None);
 
         // Assert
         saved!.AudioLanguage.Should().Be("vi");
@@ -28,6 +28,7 @@ public class CreateJobCommandHandlerTests
         saved.EnableDubbing.Should().BeTrue();
         saved.VoiceGender.Should().Be(VoiceGender.Female);
         saved.SubtitleMode.Should().Be(SubtitleMode.Softsub);
+        saved.BgmMode.Should().Be(BgmMode.DemucsAI);
         response.JobId.Should().Be(saved.Id);
         await events.Received(1).PublishAsync(
             Arg.Is<DubbingJobRequested>(message => message.JobId == saved.Id && message.AudioLanguage == "vi"),
@@ -44,7 +45,7 @@ public class CreateJobCommandHandlerTests
         var handler = new CreateJobCommandHandler(jobs, Substitute.For<IEventPublisher>());
 
         // Act
-        await handler.Handle(new CreateJobCommand("https://youtu.be/x", "en", "fr", false, VoiceGender.Male, SubtitleMode.Hardsub), CancellationToken.None);
+        await handler.Handle(new CreateJobCommand("https://youtu.be/x", "en", "fr", false, VoiceGender.Male, SubtitleMode.Hardsub, BgmMode.Duck), CancellationToken.None);
 
         // Assert
         saved!.AudioLanguage.Should().Be("en");
@@ -52,5 +53,6 @@ public class CreateJobCommandHandlerTests
         saved.EnableDubbing.Should().BeFalse();
         saved.VoiceGender.Should().Be(VoiceGender.Male);
         saved.SubtitleMode.Should().Be(SubtitleMode.Hardsub);
+        saved.BgmMode.Should().Be(BgmMode.Duck);
     }
 }

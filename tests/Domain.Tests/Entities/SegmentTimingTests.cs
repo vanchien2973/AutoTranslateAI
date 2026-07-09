@@ -49,7 +49,7 @@ public class SegmentTimingTests
     {
         // Arrange
         var segment = NewSegment();
-        segment.SetTtsResult("seg.wav", 2000);
+        segment.SetTtsResult("seg.wav", 2000, null);
 
         // Act
         segment.AdjustTiming(0, 4);
