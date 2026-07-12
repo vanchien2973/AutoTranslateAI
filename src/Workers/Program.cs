@@ -1,5 +1,5 @@
 using Application;
-using Application.Pipeline;
+using Application.Interfaces;
 using Infrastructure;
 using Serilog;
 using Workers.Consumers;
@@ -40,6 +40,8 @@ try
     builder.Services.AddTransient<IPipelineStep, UploadStep>();
 
     builder.Services.AddScoped<PipelineRunner>();
+
+    builder.Services.AddScoped<IPublishStep, PublishStep>();
 
     var host = builder.Build();
     host.Run();

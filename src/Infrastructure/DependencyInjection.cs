@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Infrastructure.Media.Demucs;
 using Infrastructure.Media.Downloader;
 using Infrastructure.Media.FFmpeg;
+using Infrastructure.Publishing;
 using Infrastructure.Resilience;
 using Infrastructure.Storage;
 using Infrastructure.Workspace;
@@ -31,8 +32,26 @@ public static class DependencyInjection
     {
         services.AddPersistence(configuration);
         services.AddProviders(configuration);
+        services.AddPublishing();
         services.AddMediaTools(configuration);
         services.AddMessaging(configuration, consumerMarkers);
+        return services;
+    }
+
+    private static IServiceCollection AddPublishing(this IServiceCollection services)
+    {
+        services.AddHttpClient();
+
+        services.AddSingleton<IPublisher, YouTubePublisher>();
+        services.AddSingleton<IPublisher, FacebookPublisher>();
+        services.AddSingleton<IPublisher, TikTokPublisher>();
+        services.AddSingleton<IPublisherFactory, PublisherFactory>();
+
+        services.AddSingleton<IOAuthProvider, YouTubeOAuthProvider>();
+        services.AddSingleton<IOAuthProvider, FacebookOAuthProvider>();
+        services.AddSingleton<IOAuthProvider, TikTokOAuthProvider>();
+        services.AddSingleton<IOAuthProviderFactory, OAuthProviderFactory>();
+
         return services;
     }
 
@@ -66,6 +85,11 @@ public static class DependencyInjection
                 .UseNpgsql(connectionString));
             services.AddScoped<AppDbContext>(sp => sp.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContext());
             services.AddScoped<IDubbingJobRepository, DubbingJobRepository>();
+
+            // Auto-publish
+            services.AddScoped<IPlatformCredentialRepository, PlatformCredentialRepository>();
+            services.AddScoped<IChannelConnectionRepository, ChannelConnectionRepository>();
+            services.AddScoped<IPublishResultRepository, PublishResultRepository>();
 
             // Persist per-step status to JobSteps so a retried message resumes from the failed step.
             services.AddScoped<IJobStepTracker, JobStepTracker>();

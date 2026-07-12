@@ -1,0 +1,3 @@
+namespace Application.Features.Publishing.SetPlatformCredential;
+
+public sealed record SetPlatformCredentialResponse(PlatformCredentialDto Credential);

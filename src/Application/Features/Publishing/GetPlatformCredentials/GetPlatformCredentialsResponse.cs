@@ -1,0 +1,3 @@
+namespace Application.Features.Publishing.GetPlatformCredentials;
+
+public sealed record GetPlatformCredentialsResponse(IReadOnlyList<PlatformCredentialDto> Credentials);

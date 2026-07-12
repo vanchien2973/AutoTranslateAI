@@ -20,7 +20,7 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity, IVersioned
             [JobStatus.ProcessingPhase2] = [JobStatus.Publishing, JobStatus.Completed, JobStatus.Failed, JobStatus.Cancelled],
             [JobStatus.Publishing] = [JobStatus.Completed, JobStatus.Failed],
             [JobStatus.Failed] = [JobStatus.DownloadingMedia, JobStatus.ProcessingPhase1, JobStatus.ProcessingPhase2, JobStatus.Cancelled],
-            [JobStatus.Completed] = [JobStatus.AwaitingReview], // reopen review to edit + re-run Phase 2
+            [JobStatus.Completed] = [JobStatus.AwaitingReview, JobStatus.Publishing], // reopen to edit, or push the finished video to platforms
             [JobStatus.Cancelled] = [],
         };
 
