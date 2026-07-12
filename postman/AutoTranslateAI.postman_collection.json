@@ -1,0 +1,1579 @@
+{
+  "info": {
+    "name": "AutoTranslateAI API",
+    "_postman_id": "a7e1c0d2-4b3a-4f7e-9c11-ataicollection01",
+    "description": "End-to-end manual test flow for the AutoTranslateAI API.\n\nSetup:\n1. Rebuild + restart the Api/Worker (these endpoints are new).\n2. Postgres + RabbitMQ running; OpenAI__ApiKey and Azure Speech key configured.\n3. Postman > Settings > turn SSL certificate verification OFF (dev cert).\n4. Set the `baseUrl` variable (default https://localhost:7269).\n\nEnums in bodies are integers: voiceGender 0=Female 1=Male; subtitleMode 0=None 1=Hardsub 2=Softsub; bgmMode 0=DemucsAI 1=Duck(-12dB) 2=None.\n\nRun folders in order. Requests capture jobId/segmentId/proposalId into collection variables automatically. Status endpoints are polled by re-sending until the status matches.\n\nPhase 5: segment update + bulk accept speakerLabel + assignedVoice (multi-speaker) — pick voice ids from GET /api/voices?language=... . Logo watermark is configured in appsettings (\"Logo\": { Path, Position, ScalePercent, Margin }), not via the API.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://localhost:7269"
+    },
+    {
+      "key": "sourceUrl",
+      "value": "https://www.youtube.com/shorts/RiOqgmmcSvc"
+    },
+    {
+      "key": "jobId",
+      "value": ""
+    },
+    {
+      "key": "subtitleJobId",
+      "value": ""
+    },
+    {
+      "key": "segmentId",
+      "value": ""
+    },
+    {
+      "key": "proposalId",
+      "value": ""
+    },
+    {
+      "key": "bgmJobId",
+      "value": ""
+    },
+    {
+      "key": "segA",
+      "value": ""
+    },
+    {
+      "key": "segB",
+      "value": ""
+    },
+    {
+      "key": "redirectUri",
+      "value": "http://localhost:5173/oauth/callback"
+    },
+    {
+      "key": "authCode",
+      "value": ""
+    },
+    {
+      "key": "connectionId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Health & Discovery",
+      "item": [
+        {
+          "name": "Health (liveness)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Health (readiness)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "console.log('readiness:', pm.response.text());"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/health/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "ready"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Supported audio languages",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('returns a non-empty list', () => pm.expect(pm.response.json()).to.be.an('array').that.is.not.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/voices/languages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "voices",
+                "languages"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Voices for a language",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/voices?language=vi",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "voices"
+              ],
+              "query": [
+                {
+                  "key": "language",
+                  "value": "vi"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Validation (fail-fast)",
+      "item": [
+        {
+          "name": "Unsupported audio language + dubbing -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"sourceUrl\": \"{{sourceUrl}}\", \"audioLanguage\": \"xx\", \"enableDubbing\": true }"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Unsupported audio language + no dubbing -> 202",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 Accepted (no TTS needed)', () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"sourceUrl\": \"{{sourceUrl}}\", \"audioLanguage\": \"xx\", \"subtitleLanguage\": \"vi\", \"enableDubbing\": false }"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Missing sourceUrl -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"sourceUrl\": \"\", \"audioLanguage\": \"vi\" }"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Scenario A - Full dub (EN->VI, softsub)",
+      "item": [
+        {
+          "name": "Create job",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 Accepted', () => pm.response.to.have.status(202));",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('jobId', j.jobId);",
+                  "pm.test('returns jobId', () => pm.expect(j.jobId).to.be.a('string'));",
+                  "console.log('jobId =', j.jobId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"sourceUrl\": \"{{sourceUrl}}\", \"audioLanguage\": \"vi\", \"subtitleLanguage\": \"vi\", \"enableDubbing\": true, \"voiceGender\": 0, \"subtitleMode\": 2, \"bgmMode\": 0 }"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get status (re-send until AwaitingReview)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "console.log('status =', j.status, '| progress =', j.progressPercent, '| segments =', j.segmentCount);",
+                  "pm.test('reached AwaitingReview (re-send if not)', () => pm.expect(j.status).to.eql('AwaitingReview'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List segments (paged) + capture first id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('has items', () => pm.expect(j.items).to.be.an('array').that.is.not.empty);",
+                  "if (j.items && j.items.length) { pm.collectionVariables.set('segmentId', j.items[0].id); console.log('segmentId =', j.items[0].id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}/segments?page=1&pageSize=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}",
+                "segments"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update segment (manual edit)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('marked edited', () => pm.expect(pm.response.json().isEdited).to.be.true);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"audioTextEdited\": \"bản sửa tay\" }"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}/segments/{{segmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}",
+                "segments",
+                "{{segmentId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Review chat (AI proposals) + capture proposalId",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "console.log('assistant:', j.assistantMessage);",
+                  "if (j.proposals && j.proposals.length) { pm.collectionVariables.set('proposalId', j.proposals[0].proposalId); console.log('proposalId =', j.proposals[0].proposalId); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userMessage\": \"dịch câu 1 tự nhiên hơn\" }"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}/review/chat",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}",
+                "review",
+                "chat"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get chat history (paged)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}/review/chat?page=1&pageSize=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}",
+                "review",
+                "chat"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Apply proposal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}/review/chat/{{proposalId}}/apply",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}",
+                "review",
+                "chat",
+                "{{proposalId}}",
+                "apply"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Adjust segment timing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 or 409 (409 = overlaps a neighbour)', () => pm.expect(pm.response.code).to.be.oneOf([200, 409]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"startTime\": 0.0, \"endTime\": 2.0 }"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}/segments/{{segmentId}}/timing",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}",
+                "segments",
+                "{{segmentId}}",
+                "timing"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Confirm (kick off Phase 2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('moved to ConfirmedQueued', () => pm.expect(pm.response.json().status).to.eql('ConfirmedQueued'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}",
+                "confirm"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get status (re-send until Completed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "console.log('status =', j.status, '| progress =', j.progressPercent);",
+                  "pm.test('reached Completed (re-send if not)', () => pm.expect(j.status).to.eql('Completed'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get download URL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('has presigned url', () => pm.expect(j.url).to.be.a('string'));",
+                  "console.log('download url =', j.url);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}/download",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}",
+                "download"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Scenario B - Subtitle-only (keep original audio)",
+      "item": [
+        {
+          "name": "Create job (no dub, hardsub)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 Accepted', () => pm.response.to.have.status(202));",
+                  "pm.collectionVariables.set('subtitleJobId', pm.response.json().jobId);",
+                  "console.log('subtitleJobId =', pm.collectionVariables.get('subtitleJobId'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"sourceUrl\": \"{{sourceUrl}}\", \"audioLanguage\": \"en\", \"subtitleLanguage\": \"vi\", \"enableDubbing\": false, \"subtitleMode\": 1 }"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get status (re-send until AwaitingReview)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "console.log('status =', j.status);",
+                  "pm.test('reached AwaitingReview (re-send if not)', () => pm.expect(j.status).to.eql('AwaitingReview'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{subtitleJobId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{subtitleJobId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Confirm",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{subtitleJobId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{subtitleJobId}}",
+                "confirm"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get download URL (re-send until Completed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 (Completed) or 409 (still processing)', () => pm.expect(pm.response.code).to.be.oneOf([200, 409]));",
+                  "if (pm.response.code === 200) console.log('download url =', pm.response.json().url);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{subtitleJobId}}/download",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{subtitleJobId}}",
+                "download"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Job management",
+      "item": [
+        {
+          "name": "List jobs (paged)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('has paged shape', () => pm.expect(j).to.have.all.keys('items','page','pageSize','totalCount','totalPages'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs?page=1&pageSize=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "5"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel job",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 (cancelled) or 409 (already finished)', () => pm.expect(pm.response.code).to.be.oneOf([200, 409]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}",
+                "cancel"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reopen job (Completed -> AwaitingReview)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 (reopened) or 409 (not completed)', () => pm.expect(pm.response.code).to.be.oneOf([200, 409]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}/reopen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}",
+                "reopen"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Phase 5 - Multi-speaker & BGM",
+      "item": [
+        {
+          "name": "Create job (BGM = Duck -12dB)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 Accepted', () => pm.response.to.have.status(202));",
+                  "pm.collectionVariables.set('bgmJobId', pm.response.json().jobId);",
+                  "console.log('bgmJobId =', pm.collectionVariables.get('bgmJobId'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"sourceUrl\": \"{{sourceUrl}}\", \"audioLanguage\": \"vi\", \"subtitleLanguage\": \"vi\", \"enableDubbing\": true, \"voiceGender\": 0, \"subtitleMode\": 2, \"bgmMode\": 1 }"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get voices for vi (pick voice ids)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "console.log('voices:', pm.response.text());"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/voices?language=vi",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "voices"
+              ],
+              "query": [
+                {
+                  "key": "language",
+                  "value": "vi"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get status (re-send until AwaitingReview)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "console.log('status =', j.status, '| bgm job');",
+                  "pm.test('reached AwaitingReview (re-send if not)', () => pm.expect(j.status).to.eql('AwaitingReview'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{bgmJobId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{bgmJobId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List segments (capture two ids)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const items = pm.response.json().items;",
+                  "pm.test('at least 2 segments', () => pm.expect(items.length).to.be.at.least(2));",
+                  "pm.collectionVariables.set('segA', items[0].id);",
+                  "pm.collectionVariables.set('segB', items[1].id);",
+                  "console.log('segA =', items[0].id, '| segB =', items[1].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{bgmJobId}}/segments?page=1&pageSize=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{bgmJobId}}",
+                "segments"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Assign Speaker A + female voice (single)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const s = pm.response.json();",
+                  "pm.test('speaker + voice assigned', () => { pm.expect(s.speakerLabel).to.eql('Speaker A'); pm.expect(s.assignedVoice).to.eql('vi-VN-HoaiMyNeural'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"speakerLabel\": \"Speaker A\", \"assignedVoice\": \"vi-VN-HoaiMyNeural\" }"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{bgmJobId}}/segments/{{segA}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{bgmJobId}}",
+                "segments",
+                "{{segA}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Assign Speaker B + male voice (bulk)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"segments\": [ { \"segmentId\": \"{{segB}}\", \"speakerLabel\": \"Speaker B\", \"assignedVoice\": \"vi-VN-NamMinhNeural\" } ] }"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{bgmJobId}}/segments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{bgmJobId}}",
+                "segments"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify speakers + voices on segments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const items = pm.response.json().items;",
+                  "const a = items.find(x => x.id === pm.collectionVariables.get('segA'));",
+                  "const b = items.find(x => x.id === pm.collectionVariables.get('segB'));",
+                  "pm.test('Speaker A voice', () => pm.expect(a.assignedVoice).to.eql('vi-VN-HoaiMyNeural'));",
+                  "pm.test('Speaker B voice', () => pm.expect(b.assignedVoice).to.eql('vi-VN-NamMinhNeural'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{bgmJobId}}/segments?page=1&pageSize=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{bgmJobId}}",
+                "segments"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Confirm (render: ducked BGM + 2 voices + logo if configured)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "console.log('Compare output audio vs a DemucsAI/None job to hear the BGM difference.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{bgmJobId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{bgmJobId}}",
+                "confirm"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Phase 6 - Auto-publish (YouTube/Facebook/TikTok)",
+      "description": "Quản lý khóa app + kết nối account (OAuth, nhiều account/platform) rồi đăng video ĐÃ HOÀN TẤT.\n\nFlow publish QUA QUEUE (bất đồng bộ):\n1) PUT credentials cho từng nền tảng\n2) GET auth-url → user cấp quyền → POST connect (lặp lại để có nhiều account)\n3) (tuỳ chọn) Generate SEO lấy title/description/tags\n4) POST publish → 202 Accepted, job chuyển sang Publishing (RabbitMQ → PublishConsumer)\n5) Poll job status thấy Publishing → Completed\n6) GET publish results xem kết quả từng nền tảng\n\nYêu cầu: {{jobId}} phải là job Completed (chạy Scenario A trước để có jobId).",
+      "item": [
+        {
+          "name": "Set YouTube credentials",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/publishing/credentials/YouTube",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "publishing",
+                "credentials",
+                "YouTube"
+              ]
+            },
+            "description": "Nhập client id/secret của Google Cloud OAuth app (scope youtube.upload).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"YOUR_CLIENT_ID\",\n  \"clientSecret\": \"YOUR_CLIENT_SECRET\",\n  \"defaultRedirectUri\": \"{{redirectUri}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Set Facebook credentials",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/publishing/credentials/Facebook",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "publishing",
+                "credentials",
+                "Facebook"
+              ]
+            },
+            "description": "Nhập App ID/App Secret của Facebook app.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"YOUR_CLIENT_ID\",\n  \"clientSecret\": \"YOUR_CLIENT_SECRET\",\n  \"defaultRedirectUri\": \"{{redirectUri}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Set TikTok credentials",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/publishing/credentials/TikTok",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "publishing",
+                "credentials",
+                "TikTok"
+              ]
+            },
+            "description": "Nhập client key/secret của TikTok developer app (client_key = clientId).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"YOUR_CLIENT_ID\",\n  \"clientSecret\": \"YOUR_CLIENT_SECRET\",\n  \"defaultRedirectUri\": \"{{redirectUri}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List credentials",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/publishing/credentials",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "publishing",
+                "credentials"
+              ]
+            },
+            "description": "Secret luôn bị ẩn, chỉ hiện HasSecret."
+          }
+        },
+        {
+          "name": "Get auth URL (YouTube)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/publishing/channels/auth-url?platform=YouTube&redirectUri={{redirectUri}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "publishing",
+                "channels",
+                "auth-url"
+              ],
+              "query": [
+                {
+                  "key": "platform",
+                  "value": "YouTube"
+                },
+                {
+                  "key": "redirectUri",
+                  "value": "{{redirectUri}}"
+                }
+              ]
+            },
+            "description": "Mở url trả về trên trình duyệt để user cấp quyền; nhận lại 'code' ở redirectUri."
+          }
+        },
+        {
+          "name": "Connect channel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/publishing/channels/connect",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "publishing",
+                "channels",
+                "connect"
+              ]
+            },
+            "description": "Đổi authorization code lấy token và lưu account. Lặp lại với account khác để có nhiều connection.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"platform\": \"YouTube\",\n  \"code\": \"{{authCode}}\",\n  \"redirectUri\": \"{{redirectUri}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List channels",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/publishing/channels",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "publishing",
+                "channels"
+              ]
+            },
+            "description": "Danh sách account đã kết nối (dùng Id làm connectionId khi publish)."
+          }
+        },
+        {
+          "name": "Generate SEO (LLM)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}/seo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}",
+                "seo"
+              ]
+            },
+            "description": "Gợi ý title/description/tags từ transcript để dùng khi publish."
+          }
+        },
+        {
+          "name": "Publish job (multi-platform)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}",
+                "publish"
+              ]
+            },
+            "description": "Xếp hàng đăng bài (bất đồng bộ qua RabbitMQ). Trả 202 Accepted với status=Publishing; Worker chuyển job Completed→Publishing→Completed và ghi PublishResults. connectionId=null => account mới nhất. Poll kết quả bằng 'Get publish results'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targets\": [\n    {\n      \"platform\": \"YouTube\",\n      \"connectionId\": null,\n      \"title\": \"My dubbed video\",\n      \"description\": \"Made with AutoTranslateAI\",\n      \"tags\": [\n        \"dubbing\",\n        \"vi\"\n      ]\n    },\n    {\n      \"platform\": \"TikTok\",\n      \"connectionId\": null,\n      \"title\": \"My dubbed video\",\n      \"description\": null,\n      \"tags\": []\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 Accepted (queued)', () => pm.response.to.have.status(202));",
+                  "const j = pm.response.json();",
+                  "console.log('queued publish for job', j.jobId, '| status =', j.status);",
+                  "pm.test('status = Publishing', () => pm.expect(j.status).to.eql('Publishing'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Poll job status (Publishing → Completed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "console.log('job status =', j.status, '| currentStep =', j.currentStep);",
+                  "const publishStep = (j.steps || []).find(s => s.stepType === 'Publish');",
+                  "if (publishStep) { console.log('Publish step =', publishStep.status); }",
+                  "// Ngay sau POST publish job thường là Publishing; gọi lại vài giây sau sẽ thấy Completed.",
+                  "pm.test('status is Publishing or Completed', () =>",
+                  "  pm.expect(['Publishing','Completed']).to.include(j.status));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}"
+              ]
+            },
+            "description": "Gọi lặp lại để thấy job đi Completed → Publishing → Completed. JobSteps có thêm dòng 'Publish'. Worker xử lý bất đồng bộ nên có thể phải gọi lại sau vài giây."
+          }
+        },
+        {
+          "name": "Get publish results",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/{{jobId}}/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{jobId}}",
+                "publish"
+              ]
+            },
+            "description": "Poll sau khi Publish job: mỗi nền tảng 1 dòng (Published/Failed + URL/ExternalId hoặc lỗi)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const results = pm.response.json();",
+                  "const P = ['YouTube','Facebook','TikTok'];",
+                  "const S = ['Pending','Publishing','Published','Failed'];",
+                  "results.forEach(r => console.log(P[r.platform] || r.platform, '=>', S[r.status] || r.status, '| url:', r.url, '| err:', r.error));",
+                  "// Poll lại tới khi không còn Pending/Publishing (Worker đăng xong).",
+                  "const pending = results.filter(r => r.status === 0 || r.status === 1).length;",
+                  "console.log('còn đang xử lý:', pending, '/', results.length);",
+                  "pm.test('is an array', () => pm.expect(results).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

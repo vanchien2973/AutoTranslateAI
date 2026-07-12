@@ -1,4 +1,3 @@
-using Application.Enums;
 using Application.Features.Jobs.CancelJob;
 using Application.Features.Jobs.ConfirmJob;
 using Application.Features.Jobs.CreateJob;
@@ -6,6 +5,9 @@ using Application.Features.Jobs.GetJobDownload;
 using Application.Features.Jobs.GetJobs;
 using Application.Features.Jobs.GetJobStatus;
 using Application.Features.Jobs.ReopenJob;
+using Application.Features.Publishing.GenerateSeoMetadata;
+using Application.Features.Publishing.GetPublishResults;
+using Application.Features.Publishing.PublishJob;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -34,6 +36,40 @@ public sealed class JobsController : ControllerBase
     {
         var response = await _mediator.Send(new GetJobStatusQuery(id), cancellationToken);
         return response.Status == OperationStatus.NotFound ? NotFound() : Ok(response.Job);
+    }
+
+    [HttpPost("{id:guid}/seo")]
+    public async Task<IActionResult> GenerateSeo(Guid id, CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(new GenerateSeoMetadataQuery(id), cancellationToken);
+        return response.Status switch
+        {
+            SeoStatus.Ok => Ok(response.Metadata),
+            SeoStatus.JobNotFound => NotFound(response.Error),
+            SeoStatus.GenerationFailed => StatusCode(StatusCodes.Status502BadGateway, response.Error),
+            _ => StatusCode(StatusCodes.Status500InternalServerError),
+        };
+    }
+
+    [HttpPost("{id:guid}/publish")]
+    public async Task<IActionResult> Publish(Guid id, [FromBody] PublishJobCommand command, CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(command with { JobId = id }, cancellationToken);
+        return response.Status switch
+        {
+            PublishJobStatus.Ok => Accepted(new { jobId = id, status = "Publishing" }),
+            PublishJobStatus.JobNotFound => NotFound(response.Error),
+            PublishJobStatus.NotCompleted => Conflict(response.Error),
+            PublishJobStatus.NoTargets => BadRequest(response.Error),
+            _ => StatusCode(StatusCodes.Status500InternalServerError),
+        };
+    }
+
+    [HttpGet("{id:guid}/publish")]
+    public async Task<IActionResult> PublishResults(Guid id, CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(new GetPublishResultsQuery(id), cancellationToken);
+        return Ok(response.Results);
     }
 
     [HttpPost]
