@@ -1,5 +1,6 @@
 using Application.Interfaces;
 using Domain.Entities;
+using Domain.Enums;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -38,4 +39,27 @@ public sealed class DubbingJobRepository : IDubbingJobRepository
         var items = await query.Skip(skip).Take(take).ToListAsync(cancellationToken);
         return (items, total);
     }
+
+    public async Task<IReadOnlyList<DubbingJob>> ListTerminalCreatedBeforeAsync(
+        DateTimeOffset cutoff,
+        CancellationToken cancellationToken) =>
+        await _dbContext.DubbingJobs
+            .AsNoTracking()
+            .Where(job => (job.Status == JobStatus.Completed
+                    || job.Status == JobStatus.Failed
+                    || job.Status == JobStatus.Cancelled)
+                && job.CreatedAt < cutoff)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Guid>> ListActiveJobIdsAsync(CancellationToken cancellationToken) =>
+        await _dbContext.DubbingJobs
+            .AsNoTracking()
+            .Where(job => job.Status != JobStatus.Completed
+                && job.Status != JobStatus.Failed
+                && job.Status != JobStatus.Cancelled)
+            .Select(job => job.Id)
+            .ToListAsync(cancellationToken);
+
+    public Task<int> DeleteAsync(IReadOnlyList<Guid> jobIds, CancellationToken cancellationToken) =>
+        _dbContext.DubbingJobs.Where(job => jobIds.Contains(job.Id)).ExecuteDeleteAsync(cancellationToken);
 }

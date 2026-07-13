@@ -38,10 +38,9 @@ try
     builder.Services.AddTransient<IPipelineStep, MixStep>();
     builder.Services.AddTransient<IPipelineStep, RenderStep>();
     builder.Services.AddTransient<IPipelineStep, UploadStep>();
-
     builder.Services.AddScoped<PipelineRunner>();
-
     builder.Services.AddScoped<IPublishStep, PublishStep>();
+    builder.Services.AddHostedService<Workers.Services.CleanupBackgroundService>();
 
     var host = builder.Build();
     host.Run();

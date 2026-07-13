@@ -14,15 +14,18 @@ public sealed class AzureTtsService : ITtsService
 {
     private readonly AzureSpeechOptions _options;
     private readonly ExternalApiResiliencePipeline _resilience;
+    private readonly IUsageTracker _usage;
     private readonly ILogger<AzureTtsService> _logger;
 
     public AzureTtsService(
         IOptions<AzureSpeechOptions> options,
         ExternalApiResiliencePipeline resilience,
+        IUsageTracker usage,
         ILogger<AzureTtsService> logger)
     {
         _options = options.Value;
         _resilience = resilience;
+        _usage = usage;
         _logger = logger;
     }
 
@@ -38,6 +41,10 @@ public sealed class AzureTtsService : ITtsService
         // per-attempt timeout in the pipeline guards against a hung Azure call.
         var durationMs = await _resilience.Pipeline.ExecuteAsync(
             async _ => await SynthesizeOnceAsync(ssml, request.OutputPath),
+            cancellationToken);
+
+        await _usage.RecordAsync(
+            new UsageEntry("Azure", "Tts", Domain.Enums.UsageUnit.Characters, request.Text.Length),
             cancellationToken);
 
         _logger.LogInformation("Synthesized {Ms}ms with voice {Voice} to {Path}", durationMs, voice, request.OutputPath);

@@ -15,6 +15,7 @@ using Infrastructure.Media.FFmpeg;
 using Infrastructure.Publishing;
 using Infrastructure.Resilience;
 using Infrastructure.Storage;
+using Infrastructure.Usage;
 using Infrastructure.Workspace;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
@@ -60,7 +61,9 @@ public static class DependencyInjection
         services.AddValidatedOptions<MediaToolsOptions>(configuration, MediaToolsOptions.SectionName);
         services.AddValidatedOptions<WorkspaceOptions>(configuration, WorkspaceOptions.SectionName);
         services.AddValidatedOptions<LogoOptions>(configuration, LogoOptions.SectionName);
+        services.AddValidatedOptions<CleanupOptions>(configuration, CleanupOptions.SectionName);
         services.AddSingleton<IWorkspaceManager, WorkspaceManager>();
+        services.AddSingleton<IWorkspaceJanitor, WorkspaceJanitor>();
         services.AddSingleton<IVideoDownloader, YtDlpVideoDownloader>();
         services.AddSingleton<IAudioExtractor, FfmpegAudioExtractor>();
         services.AddSingleton<IDemucsService, DemucsService>();
@@ -94,6 +97,10 @@ public static class DependencyInjection
             // Persist per-step status to JobSteps so a retried message resumes from the failed step.
             services.AddScoped<IJobStepTracker, JobStepTracker>();
 
+            // Cost/quota tracking: tracker is a singleton (injected into singleton providers) and uses the context factory; the read side is a scoped repository for the /api/usage query.
+            services.AddSingleton<IUsageTracker, UsageTracker>();
+            services.AddScoped<IUsageRepository, UsageRepository>();
+
             // DB readiness check (tag "ready"); the Api maps it at /health/ready.
             services.AddHealthChecks()
                 .AddNpgSql(connectionString, name: "postgres", tags: ["ready"]);
@@ -102,6 +109,7 @@ public static class DependencyInjection
         {
             // No DB configured: skip resume tracking (every run starts fresh).
             services.AddScoped<IJobStepTracker, NullJobStepTracker>();
+            services.AddSingleton<IUsageTracker, NullUsageTracker>();
         }
 
         return services;
@@ -117,6 +125,7 @@ public static class DependencyInjection
         services.AddValidatedOptions<PiperOptions>(configuration, PiperOptions.SectionName);
         services.AddValidatedOptions<R2Options>(configuration, R2Options.SectionName);
         services.AddValidatedOptions<ResilienceOptions>(configuration, ResilienceOptions.SectionName);
+        services.AddValidatedOptions<PricingOptions>(configuration, PricingOptions.SectionName);
 
         // Shared Polly pipeline (retry + per-attempt timeout) injected into the OpenAI/Azure adapters.
         services.AddSingleton<ExternalApiResiliencePipeline>();
@@ -165,7 +174,6 @@ public static class DependencyInjection
             var other => throw new InvalidOperationException($"Unknown Storage provider: '{other}'"),
         });
 
-        // TODO: add Ollama (Translation), Piper (Tts), Local/AzureBlob (Storage) cases when needed.
         return services;
     }
 

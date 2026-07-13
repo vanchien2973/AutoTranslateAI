@@ -11,4 +11,10 @@ public interface IDubbingJobRepository
     Task SaveChangesAsync(CancellationToken cancellationToken);
 
     Task<(IReadOnlyList<DubbingJob> Items, int TotalCount)> ListAsync(int skip, int take, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<DubbingJob>> ListTerminalCreatedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Guid>> ListActiveJobIdsAsync(CancellationToken cancellationToken);
+
+    Task<int> DeleteAsync(IReadOnlyList<Guid> jobIds, CancellationToken cancellationToken);
 }

@@ -5,6 +5,7 @@ using Api.Hubs;
 using Application;
 using Infrastructure;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog;
 using System.Text.Json;
@@ -43,27 +44,45 @@ try
     builder.Services.AddInfrastructure(builder.Configuration, typeof(JobProgressConsumer));
     builder.Services.AddSwagger();
 
+    // Basic API-key auth for shared local instances (opt-in via Auth:Enabled). Disabled => everything anonymous.
+    builder.Services.AddApiKeyAuth(builder.Configuration);
+
     // Liveness has no checks (process is up); readiness runs the "ready"-tagged checks
     // (Postgres now, RabbitMQ/R2 as they are wired in Infrastructure).
     builder.Services.AddHealthChecks();
 
     var app = builder.Build();
 
+    // Apply EF migrations at startup when opted in (Database:MigrateOnStartup) so `docker compose up`
+    // works end-to-end. Off by default for local dev (run `dotnet ef database update` yourself).
+    if (builder.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetService<Infrastructure.Persistence.AppDbContext>();
+        if (db is not null)
+        {
+            db.Database.Migrate();
+            Log.Information("Applied database migrations on startup");
+        }
+    }
+
     // Configure the HTTP request pipeline.
     app.UseSerilogRequestLogging();
 
     app.UseHttpsRedirection();
     app.UseCors(CorsPolicy);
+    app.UseAuthentication();
     app.UseAuthorization();
     app.MapControllers();
     app.MapHub<JobProgressHub>("/hubs/jobs");
     app.ConfigureSwagger();
-    app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });
+    // Health probes stay public even when API-key auth is enforced (for Docker healthchecks).
+    app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
     app.MapHealthChecks("/health/ready", new HealthCheckOptions
     {
         Predicate = check => check.Tags.Contains("ready"),
         ResponseWriter = WriteHealthJson,
-    });
+    }).AllowAnonymous();
 
     app.Run();
 }

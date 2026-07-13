@@ -17,6 +17,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<PlatformCredential> PlatformCredentials => Set<PlatformCredential>();
     public DbSet<ChannelConnection> ChannelConnections => Set<ChannelConnection>();
     public DbSet<PublishResult> PublishResults => Set<PublishResult>();
+    public DbSet<UsageRecord> UsageRecords => Set<UsageRecord>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {

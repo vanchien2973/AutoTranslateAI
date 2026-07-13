@@ -53,6 +53,10 @@
     {
       "key": "connectionId",
       "value": ""
+    },
+    {
+      "key": "apiKey",
+      "value": "Admin@123"
     }
   ],
   "item": [
@@ -1574,6 +1578,105 @@
           ]
         }
       ]
+    },
+    {
+      "name": "7. Phase 7 - Auth & Usage",
+      "description": "Đăng nhập đơn giản (admin@gmail.com / Admin@123) + theo dõi chi tiêu.\n\nAuth bật mặc định: chạy 'Login' trước để nạp {{apiKey}}; mọi request sau tự gắn header X-Api-Key. Health (/health*) và login là public.",
+      "item": [
+        {
+          "name": "Login (admin) + capture token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('apiKey', j.token);",
+                  "console.log('token =', j.token, '| send as header', j.header);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@gmail.com\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "description": "Đăng nhập admin. Trả token; các request khác tự gắn header X-Api-Key qua pre-request script của collection."
+          }
+        },
+        {
+          "name": "Usage summary (cost tracking)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const s = pm.response.json().summary;",
+                  "console.log('total $', s.totalCostUsd, '| calls', s.callCount);",
+                  "s.byProvider.forEach(p => console.log(p.key, '$'+p.costUsd, p.callCount+' calls'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/usage?days=30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "usage"
+              ],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "30"
+                }
+              ]
+            },
+            "description": "Chi phí ước tính các API tốn tiền (LLM/TTS) theo provider/operation/ngày trong N ngày gần đây."
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Phase 7: gắn token đăng nhập vào header X-Api-Key cho mọi request (nếu có).",
+          "const k = pm.collectionVariables.get('apiKey');",
+          "if (k) { pm.request.headers.upsert({ key: 'X-Api-Key', value: k }); }"
+        ]
+      }
     }
   ]
 }

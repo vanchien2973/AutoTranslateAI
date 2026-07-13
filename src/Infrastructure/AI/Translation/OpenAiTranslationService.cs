@@ -1,4 +1,5 @@
 using Application.Interfaces;
+using Domain.Enums;
 using Infrastructure.Configuration;
 using Infrastructure.Resilience;
 using Microsoft.Extensions.Logging;
@@ -13,17 +14,20 @@ public sealed class OpenAiTranslationService : ITranslationService
     private readonly ChatClient _client;
     private readonly string _model;
     private readonly ExternalApiResiliencePipeline _resilience;
+    private readonly IUsageTracker _usage;
     private readonly ILogger<OpenAiTranslationService> _logger;
 
     public OpenAiTranslationService(
         IOptions<OpenAIOptions> options,
         ExternalApiResiliencePipeline resilience,
+        IUsageTracker usage,
         ILogger<OpenAiTranslationService> logger)
     {
         var config = options.Value;
         _model = config.Model;
         _client = new ChatClient(_model, config.ApiKey);
         _resilience = resilience;
+        _usage = usage;
         _logger = logger;
     }
 
@@ -58,6 +62,11 @@ public sealed class OpenAiTranslationService : ITranslationService
             async ct => await _client.CompleteChatAsync(messages, chatOptions, ct),
             cancellationToken);
         var content = completion.Value.Content[0].Text;
+
+        var tokens = completion.Value.Usage;
+        await _usage.RecordAsync(
+            new UsageEntry("OpenAI", "Translate", UsageUnit.Tokens, tokens.InputTokenCount, tokens.OutputTokenCount),
+            cancellationToken);
 
         return TranslationResponseParser.Parse(content, texts.Count);
     }
