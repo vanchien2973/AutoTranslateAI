@@ -7,6 +7,7 @@ using Infrastructure.Review;
 using Infrastructure.Configuration;
 using Infrastructure.HealthChecks;
 using Infrastructure.Messaging;
+using Infrastructure.Monitoring;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Infrastructure.Media.Demucs;
@@ -221,6 +222,11 @@ public static class DependencyInjection
 
         // Progress emission (Worker publishes JobProgressUpdated; API consumes → SignalR).
         services.AddScoped<IProgressNotifier, MassTransitProgressNotifier>();
+
+        // Resource metrics: worker samples /proc while a job runs and publishes JobMetricsUpdated; API relays.
+        services.AddSingleton<ISystemMetricsSampler, ProcSystemMetricsSampler>();
+        services.AddScoped<IMetricsNotifier, MassTransitMetricsNotifier>();
+        services.AddScoped<IJobMetricsMonitor, JobMetricsMonitor>();
 
         // Integration-event publishing behind an Application interface (keeps MassTransit out of handlers).
         services.AddScoped<IEventPublisher, MassTransitEventPublisher>();

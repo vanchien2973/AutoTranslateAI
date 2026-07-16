@@ -42,6 +42,69 @@ public sealed class OpenAiTranslationService : ITranslationService
             return [];
         }
 
+        var billable = new List<(int Index, string Text)>(texts.Count);
+        for (var i = 0; i < texts.Count; i++)
+        {
+            if (!string.IsNullOrWhiteSpace(texts[i]))
+            {
+                billable.Add((i, texts[i]));
+            }
+        }
+
+        var result = texts.ToArray();
+        if (billable.Count == 0)
+        {
+            return result;
+        }
+
+        _logger.LogInformation(
+            "Translating {Count} segments {Source}->{Target} with {Model}",
+            billable.Count, sourceLang, targetLang, _model);
+
+        var translated = await TranslateChunkAsync(
+            billable.Select(entry => entry.Text).ToList(), sourceLang, targetLang, cancellationToken);
+
+        for (var i = 0; i < billable.Count; i++)
+        {
+            result[billable[i].Index] = translated[i];
+        }
+
+        return result;
+    }
+
+    private async Task<IReadOnlyList<string>> TranslateChunkAsync(
+        IReadOnlyList<string> texts,
+        string sourceLang,
+        string targetLang,
+        CancellationToken cancellationToken)
+    {
+        var content = await CompleteAsync(texts, sourceLang, targetLang, cancellationToken);
+        if (TranslationResponseParser.TryParse(content, texts.Count, out var translations))
+        {
+            return translations;
+        }
+
+        if (texts.Count == 1)
+        {
+            _logger.LogWarning("Translation returned an unusable shape for a single segment; keeping original text.");
+            return [texts[0]];
+        }
+
+        _logger.LogWarning(
+            "Translation count mismatch for {Count} segments; splitting the batch and retrying.", texts.Count);
+
+        var mid = texts.Count / 2;
+        var left = await TranslateChunkAsync([.. texts.Take(mid)], sourceLang, targetLang, cancellationToken);
+        var right = await TranslateChunkAsync([.. texts.Skip(mid)], sourceLang, targetLang, cancellationToken);
+        return [.. left, .. right];
+    }
+
+    private async Task<string> CompleteAsync(
+        IReadOnlyList<string> texts,
+        string sourceLang,
+        string targetLang,
+        CancellationToken cancellationToken)
+    {
         ChatMessage[] messages =
         [
             new SystemChatMessage(TranslationPromptBuilder.BuildSystemPrompt(sourceLang, targetLang)),
@@ -53,21 +116,16 @@ public sealed class OpenAiTranslationService : ITranslationService
             ResponseFormat = ChatResponseFormat.CreateJsonObjectFormat(),
         };
 
-        _logger.LogInformation(
-            "Translating {Count} segments {Source}->{Target} with {Model}",
-            texts.Count, sourceLang, targetLang, _model);
-
         // Retry transient failures (429/5xx/timeout) with back-off via the shared Polly pipeline.
         var completion = await _resilience.Pipeline.ExecuteAsync(
             async ct => await _client.CompleteChatAsync(messages, chatOptions, ct),
             cancellationToken);
-        var content = completion.Value.Content[0].Text;
 
         var tokens = completion.Value.Usage;
         await _usage.RecordAsync(
             new UsageEntry("OpenAI", "Translate", UsageUnit.Tokens, tokens.InputTokenCount, tokens.OutputTokenCount),
             cancellationToken);
 
-        return TranslationResponseParser.Parse(content, texts.Count);
+        return completion.Value.Content[0].Text;
     }
 }

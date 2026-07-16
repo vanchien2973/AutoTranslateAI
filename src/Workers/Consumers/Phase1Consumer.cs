@@ -15,17 +15,20 @@ public sealed class Phase1Consumer : IConsumer<DubbingJobRequested>
     private readonly PipelineRunner _runner;
     private readonly IDubbingJobRepository _jobs;
     private readonly IProgressNotifier _progress;
+    private readonly IJobMetricsMonitor _metrics;
     private readonly ILogger<Phase1Consumer> _logger;
 
     public Phase1Consumer(
         PipelineRunner runner,
         IDubbingJobRepository jobs,
         IProgressNotifier progress,
+        IJobMetricsMonitor metrics,
         ILogger<Phase1Consumer> logger)
     {
         _runner = runner;
         _jobs = jobs;
         _progress = progress;
+        _metrics = metrics;
         _logger = logger;
     }
 
@@ -61,7 +64,8 @@ public sealed class Phase1Consumer : IConsumer<DubbingJobRequested>
                 message.SubtitleLanguage,
                 message.EnableDubbing);
 
-            var result = await _runner.RunAsync(request, PipelinePhase.Phase1, cancellationToken);
+            var result = await _metrics.TrackAsync(
+                job.Id, ct => _runner.RunAsync(request, PipelinePhase.Phase1, ct), cancellationToken);
 
             // Persist the transcript/translation so the user can review and edit it via the API.
             job.SetSegments(result.Segments.Select(segment => SegmentMapping.ToDomain(job.Id, segment)));

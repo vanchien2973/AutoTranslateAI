@@ -15,17 +15,20 @@ public sealed class Phase2Consumer : IConsumer<DubbingJobConfirmed>
     private readonly PipelineRunner _runner;
     private readonly IDubbingJobRepository _jobs;
     private readonly IProgressNotifier _progress;
+    private readonly IJobMetricsMonitor _metrics;
     private readonly ILogger<Phase2Consumer> _logger;
 
     public Phase2Consumer(
         PipelineRunner runner,
         IDubbingJobRepository jobs,
         IProgressNotifier progress,
+        IJobMetricsMonitor metrics,
         ILogger<Phase2Consumer> logger)
     {
         _runner = runner;
         _jobs = jobs;
         _progress = progress;
+        _metrics = metrics;
         _logger = logger;
     }
 
@@ -71,7 +74,8 @@ public sealed class Phase2Consumer : IConsumer<DubbingJobConfirmed>
                 job.DuckingDb,
                 segments);
 
-            var result = await _runner.RunAsync(request, PipelinePhase.Phase2, cancellationToken);
+            var result = await _metrics.TrackAsync(
+                job.Id, ct => _runner.RunAsync(request, PipelinePhase.Phase2, ct), cancellationToken);
 
             // Persist each segment's TTS clip so a future re-review only re-synthesizes the ones that changed.
             var dbSegments = job.Segments.ToDictionary(segment => segment.SegmentIndex);

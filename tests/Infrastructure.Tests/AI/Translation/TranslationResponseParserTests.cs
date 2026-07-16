@@ -54,4 +54,32 @@ public class TranslationResponseParserTests
         // Assert
         act.Should().Throw<Exception>();
     }
+
+    [Fact]
+    public void Given_MatchingResponse_When_TryParse_Then_TrueWithStrings()
+    {
+        // Arrange
+        const string content = "{\"translations\": [\"a\", \"b\"]}";
+
+        // Act
+        var ok = TranslationResponseParser.TryParse(content, expectedCount: 2, out var translations);
+
+        // Assert
+        ok.Should().BeTrue();
+        translations.Should().ContainInOrder("a", "b");
+    }
+
+    [Theory]
+    [InlineData("{\"translations\": [\"only one\"]}")] // count mismatch
+    [InlineData("not json")] // malformed
+    [InlineData("")] // empty
+    public void Given_MalformedOrMismatched_When_TryParse_Then_FalseWithoutThrowing(string content)
+    {
+        // Act
+        var ok = TranslationResponseParser.TryParse(content, expectedCount: 2, out var translations);
+
+        // Assert
+        ok.Should().BeFalse();
+        translations.Should().BeEmpty();
+    }
 }

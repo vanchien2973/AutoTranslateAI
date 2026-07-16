@@ -4,6 +4,20 @@ namespace Infrastructure.AI.Translation;
 
 internal static class TranslationResponseParser
 {
+    public static bool TryParse(string content, int expectedCount, out IReadOnlyList<string> translations)
+    {
+        try
+        {
+            translations = Parse(content, expectedCount);
+            return true;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or JsonException)
+        {
+            translations = [];
+            return false;
+        }
+    }
+
     public static IReadOnlyList<string> Parse(string content, int expectedCount)
     {
         if (string.IsNullOrWhiteSpace(content))
