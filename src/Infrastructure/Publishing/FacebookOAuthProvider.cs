@@ -63,4 +63,10 @@ public sealed class FacebookOAuthProvider : IOAuthProvider
 
         return new ChannelTokens(pageId, pageName, pageToken, null, expiresAt);
     }
+
+    public Task<ChannelTokens> RefreshAsync(
+        OAuthAppCredentials app,
+        string refreshToken,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Reconnect the Facebook page to renew access.");
 }

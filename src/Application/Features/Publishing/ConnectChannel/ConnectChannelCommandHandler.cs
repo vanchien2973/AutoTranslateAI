@@ -40,15 +40,24 @@ public sealed class ConnectChannelCommandHandler : IRequestHandler<ConnectChanne
             return ConnectChannelResponse.ExchangeFailed(exception.Message);
         }
 
-        var connection = new ChannelConnection(
-            request.Platform,
-            tokens.ChannelId,
-            tokens.ChannelName,
-            tokens.AccessToken,
-            tokens.RefreshToken,
-            tokens.ExpiresAt);
+        var connection = await _connections.GetByChannelAsync(request.Platform, tokens.ChannelId, cancellationToken);
+        if (connection is null)
+        {
+            connection = new ChannelConnection(
+                request.Platform,
+                tokens.ChannelId,
+                tokens.ChannelName,
+                tokens.AccessToken,
+                tokens.RefreshToken,
+                tokens.ExpiresAt);
 
-        await _connections.AddAsync(connection, cancellationToken);
+            await _connections.AddAsync(connection, cancellationToken);
+        }
+        else
+        {
+            connection.UpdateTokens(tokens.AccessToken, tokens.RefreshToken, tokens.ExpiresAt);
+        }
+
         await _connections.SaveChangesAsync(cancellationToken);
 
         return ConnectChannelResponse.Ok(connection.ToDto(DateTimeOffset.UtcNow));

@@ -85,4 +85,9 @@
     animation: none;
     transform: scaleY(0.7);
   }
+
+  .animate-pulse {
+    animation: none;
+    opacity: 1;
+  }
 }

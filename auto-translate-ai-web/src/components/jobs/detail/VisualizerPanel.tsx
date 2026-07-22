@@ -40,7 +40,13 @@ export function VisualizerPanel({
         </p>
       </div>
 
-      <ProcessingVisualizer percent={percent} animate={active && !reducedMotion} />
+      {active ? (
+        <ProcessingVisualizer percent={percent} animate={!reducedMotion} />
+      ) : (
+        <div className="border-hairline text-muted/60 grid h-[220px] place-items-center rounded border border-dashed text-xs">
+          The visualizer runs while the job is processing.
+        </div>
+      )}
 
       <MetricCards
         metrics={metrics}

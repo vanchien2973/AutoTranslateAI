@@ -79,28 +79,30 @@ public static class ReviewResponseParser
         if (item.ValueKind != JsonValueKind.Object
             || !item.TryGetProperty("segmentIndex", out var indexElement)
             || indexElement.ValueKind != JsonValueKind.Number
-            || !indexElement.TryGetInt32(out var index))
+            || !indexElement.TryGetInt32(out var displayIndex))
         {
             error = "A proposal was missing a numeric \"segmentIndex\".";
             return false;
         }
 
+        var index = displayIndex - 1;
+
         if (!byIndex.TryGetValue(index, out var segment))
         {
-            error = $"Proposal referenced unknown segment index {index}.";
+            error = $"Proposal referenced unknown segment {displayIndex}.";
             return false;
         }
 
         if (!Enum.TryParse<EditTarget>(GetString(item, "target"), ignoreCase: true, out var target))
         {
-            error = $"Proposal for segment {index} had an invalid target.";
+            error = $"Proposal for segment {displayIndex} had an invalid target.";
             return false;
         }
 
         var proposedText = GetString(item, "proposedText");
         if (string.IsNullOrWhiteSpace(proposedText))
         {
-            error = $"Proposal for segment {index} had empty proposedText.";
+            error = $"Proposal for segment {displayIndex} had empty proposedText.";
             return false;
         }
 

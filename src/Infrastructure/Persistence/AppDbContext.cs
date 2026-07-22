@@ -14,6 +14,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<DubbingJob> DubbingJobs => Set<DubbingJob>();
     public DbSet<Segment> Segments => Set<Segment>();
     public DbSet<JobStep> JobSteps => Set<JobStep>();
+    public DbSet<JobPublishTarget> JobPublishTargets => Set<JobPublishTarget>();
     public DbSet<PlatformCredential> PlatformCredentials => Set<PlatformCredential>();
     public DbSet<ChannelConnection> ChannelConnections => Set<ChannelConnection>();
     public DbSet<PublishResult> PublishResults => Set<PublishResult>();

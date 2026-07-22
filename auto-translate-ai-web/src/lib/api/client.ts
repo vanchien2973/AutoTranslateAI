@@ -31,6 +31,10 @@ export function setApiKey(key: string | null) {
   else window.localStorage.removeItem(API_KEY_STORAGE_KEY);
 }
 
+export function hasSession(): boolean {
+  return typeof window !== "undefined" && Boolean(window.localStorage.getItem(API_KEY_STORAGE_KEY));
+}
+
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
@@ -46,6 +50,12 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   }
 
   if (!response.ok) {
+    if ((response.status === 401 || response.status === 403) && hasSession()) {
+      setApiKey(null);
+      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+        window.location.assign("/login");
+      }
+    }
     throw new ApiError(response.status, await readError(response));
   }
 

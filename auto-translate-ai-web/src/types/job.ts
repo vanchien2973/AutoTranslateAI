@@ -32,10 +32,12 @@ export type StepType = (typeof STEP_TYPES)[number];
 export const VoiceGender = { Female: 0, Male: 1 } as const;
 export const SubtitleMode = { None: 0, Hardsub: 1, Softsub: 2 } as const;
 export const BgmMode = { DemucsAI: 0, Duck: 1, None: 2 } as const;
+export const LogoPosition = { TopLeft: 0, TopRight: 1, BottomLeft: 2, BottomRight: 3 } as const;
 
 export type VoiceGenderValue = (typeof VoiceGender)[keyof typeof VoiceGender];
 export type SubtitleModeValue = (typeof SubtitleMode)[keyof typeof SubtitleMode];
 export type BgmModeValue = (typeof BgmMode)[keyof typeof BgmMode];
+export type LogoPositionValue = (typeof LogoPosition)[keyof typeof LogoPosition];
 
 export interface CreateJobInput {
   sourceUrl: string;
@@ -45,6 +47,16 @@ export interface CreateJobInput {
   voiceGender?: VoiceGenderValue;
   subtitleMode?: SubtitleModeValue;
   bgmMode?: BgmModeValue;
+  autoPublishTargets?: {
+    platform: number;
+    connectionId?: string;
+    title?: string;
+    description?: string;
+  }[];
+  logoStorageKey?: string;
+  logoPosition?: LogoPositionValue;
+  logoScalePercent?: number;
+  logoMargin?: number;
 }
 
 export interface JobSummary {
@@ -75,6 +87,9 @@ export interface JobStep {
 export interface JobDetail {
   id: string;
   status: JobStatus;
+  audioLanguage: string;
+  subtitleLanguage: string | null;
+  enableDubbing: boolean;
   currentStep: StepType | null;
   progressPercent: number;
   errorMessage: string | null;
@@ -110,10 +125,23 @@ export interface Segment {
   startTime: number;
   endTime: number;
   originalText: string;
-  subtitleText: string;
+  audioTextAi: string | null;
+  audioTextEdited: string | null;
+  subtitleTextAi: string | null;
+  subtitleTextEdited: string | null;
   ttsText: string;
+  subtitleText: string;
   speakerLabel: string | null;
+  assignedVoice: string | null;
   isEdited: boolean;
+  needsTtsRegenerate: boolean;
+}
+
+export interface SegmentEdit {
+  audioTextEdited?: string | null;
+  subtitleTextEdited?: string | null;
+  speakerLabel?: string | null;
+  assignedVoice?: string | null;
 }
 
 export interface PagedResult<T> {
@@ -133,6 +161,16 @@ const ACTIVE_STATUSES: ReadonlySet<JobStatus> = new Set<JobStatus>([
 
 export function isActive(status: JobStatus) {
   return ACTIVE_STATUSES.has(status);
+}
+
+const SETTLED_STATUSES: ReadonlySet<JobStatus> = new Set<JobStatus>([
+  "AwaitingReview",
+  "Completed",
+  "Cancelled",
+]);
+
+export function isInFlight(status: JobStatus) {
+  return !SETTLED_STATUSES.has(status);
 }
 
 export function jobTitle(job: JobSummary) {

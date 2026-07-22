@@ -25,23 +25,10 @@ public sealed class FfmpegVideoRenderer : IVideoRenderer
     {
         _logger.LogInformation("Rendering {Video} + {Audio} into {Output}", request.VideoPath, request.AudioPath, request.OutputPath);
 
-        var effective = request;
-        if (!string.IsNullOrWhiteSpace(_logo.Path))
+        var effective = LogoResolver.Resolve(request, _logo);
+        if (effective.LogoPath is null && !string.IsNullOrWhiteSpace(_logo.Path))
         {
-            if (IsRemote(_logo.Path) || File.Exists(_logo.Path))
-            {
-                effective = request with
-                {
-                    LogoPath = _logo.Path,
-                    LogoPosition = _logo.Position,
-                    LogoScalePercent = _logo.ScalePercent,
-                    LogoMargin = _logo.Margin,
-                };
-            }
-            else
-            {
-                _logger.LogWarning("Logo path '{Path}' not found; rendering without a watermark.", _logo.Path);
-            }
+            _logger.LogWarning("Logo path '{Path}' not found; rendering without a watermark.", _logo.Path);
         }
 
         var arguments = FfmpegArguments.BuildRender(effective);
@@ -49,8 +36,4 @@ public sealed class FfmpegVideoRenderer : IVideoRenderer
 
         return request.OutputPath;
     }
-
-    private static bool IsRemote(string path) =>
-        path.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
-        || path.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
 }

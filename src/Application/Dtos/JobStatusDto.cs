@@ -3,6 +3,9 @@ namespace Application.Dtos;
 public sealed record JobStatusDto(
     Guid Id,
     string Status,
+    string AudioLanguage,
+    string? SubtitleLanguage,
+    bool EnableDubbing,
     string? CurrentStep,
     int ProgressPercent,
     string? ErrorMessage,

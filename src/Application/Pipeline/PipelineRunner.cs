@@ -42,6 +42,10 @@ public sealed class PipelineRunner
             SubtitleMode = request.SubtitleMode,
             BgmMode = request.BgmMode,
             DuckingDb = request.DuckingDb,
+            LogoStorageKey = request.LogoStorageKey,
+            LogoPosition = request.LogoPosition,
+            LogoScalePercent = request.LogoScalePercent,
+            LogoMargin = request.LogoMargin,
         };
 
         // Resume: rehydrate artifacts/segments from the last snapshot and learn which steps already finished.

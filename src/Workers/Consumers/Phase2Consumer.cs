@@ -1,6 +1,7 @@
 using Application.Interfaces;
 using Application.Messaging;
 using Application.Pipeline;
+using Domain.Entities;
 using Domain.Enums;
 using MassTransit;
 
@@ -16,6 +17,7 @@ public sealed class Phase2Consumer : IConsumer<DubbingJobConfirmed>
     private readonly IDubbingJobRepository _jobs;
     private readonly IProgressNotifier _progress;
     private readonly IJobMetricsMonitor _metrics;
+    private readonly IEventPublisher _events;
     private readonly ILogger<Phase2Consumer> _logger;
 
     public Phase2Consumer(
@@ -23,12 +25,14 @@ public sealed class Phase2Consumer : IConsumer<DubbingJobConfirmed>
         IDubbingJobRepository jobs,
         IProgressNotifier progress,
         IJobMetricsMonitor metrics,
+        IEventPublisher events,
         ILogger<Phase2Consumer> logger)
     {
         _runner = runner;
         _jobs = jobs;
         _progress = progress;
         _metrics = metrics;
+        _events = events;
         _logger = logger;
     }
 
@@ -72,7 +76,11 @@ public sealed class Phase2Consumer : IConsumer<DubbingJobConfirmed>
                 job.SubtitleMode,
                 job.BgmMode,
                 job.DuckingDb,
-                segments);
+                segments,
+                job.LogoStorageKey,
+                job.LogoPosition,
+                job.LogoScalePercent,
+                job.LogoMargin);
 
             var result = await _metrics.TrackAsync(
                 job.Id, ct => _runner.RunAsync(request, PipelinePhase.Phase2, ct), cancellationToken);
@@ -92,6 +100,8 @@ public sealed class Phase2Consumer : IConsumer<DubbingJobConfirmed>
 
             await _progress.ReportAsync(new JobProgress(job.Id, nameof(JobStatus.Completed), null, 100), cancellationToken);
             _logger.LogInformation("Job {JobId}: done. Output URL: {Url}", message.JobId, result.OutputUrl);
+
+            await RequestAutoPublishAsync(job, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -108,5 +118,21 @@ public sealed class Phase2Consumer : IConsumer<DubbingJobConfirmed>
 
             throw;
         }
+    }
+
+    private async Task RequestAutoPublishAsync(DubbingJob job, CancellationToken cancellationToken)
+    {
+        if (job.AutoPublishTargets.Count == 0)
+        {
+            return;
+        }
+
+        var targets = job.AutoPublishTargets
+            .Select(target => new PublishTarget(
+                target.Platform, target.ConnectionId, target.Title, target.Description, null))
+            .ToList();
+
+        await _events.PublishAsync(new DubbingJobPublishRequested(job.Id, targets), cancellationToken);
+        _logger.LogInformation("Job {JobId}: auto-publish queued for {Count} target(s)", job.Id, targets.Count);
     }
 }

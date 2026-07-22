@@ -102,6 +102,19 @@ namespace Infrastructure.Migrations
                     b.Property<string>("LocalFilePath")
                         .HasColumnType("text");
 
+                    b.Property<int>("LogoMargin")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LogoPosition")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("LogoScalePercent")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("LogoStorageKey")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
                     b.Property<string>("OutputFilePath")
                         .HasColumnType("text");
 
@@ -152,6 +165,39 @@ namespace Infrastructure.Migrations
                     b.HasIndex("Status");
 
                     b.ToTable("DubbingJobs", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.JobPublishTarget", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ConnectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(5000)
+                        .HasColumnType("character varying(5000)");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Platform")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobId", "Platform")
+                        .IsUnique();
+
+                    b.ToTable("JobPublishTargets", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.JobStep", b =>
@@ -392,6 +438,15 @@ namespace Infrastructure.Migrations
                     b.ToTable("UsageRecords", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Entities.JobPublishTarget", b =>
+                {
+                    b.HasOne("Domain.Entities.DubbingJob", null)
+                        .WithMany("AutoPublishTargets")
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Domain.Entities.JobStep", b =>
                 {
                     b.HasOne("Domain.Entities.DubbingJob", null)
@@ -412,6 +467,8 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Entities.DubbingJob", b =>
                 {
+                    b.Navigation("AutoPublishTargets");
+
                     b.Navigation("Segments");
 
                     b.Navigation("Steps");

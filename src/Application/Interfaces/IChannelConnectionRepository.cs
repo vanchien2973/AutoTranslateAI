@@ -9,6 +9,8 @@ public interface IChannelConnectionRepository
 
     Task<ChannelConnection?> GetLatestAsync(PublishPlatform platform, CancellationToken cancellationToken);
 
+    Task<ChannelConnection?> GetByChannelAsync(PublishPlatform platform, string channelId, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<ChannelConnection>> ListAsync(CancellationToken cancellationToken);
 
     Task AddAsync(ChannelConnection connection, CancellationToken cancellationToken);

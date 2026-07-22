@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 
-import { Header } from "@/components/layout/Header";
-import { Sidebar } from "@/components/layout/Sidebar";
+import { AppFrame } from "@/components/layout/AppFrame";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -38,13 +37,7 @@ export default function RootLayout({
     >
       <body className="h-full">
         <Providers>
-          <div className="flex h-full overflow-hidden">
-            <Sidebar />
-            <div className="flex min-w-0 flex-1 flex-col">
-              <Header />
-              <main className="flex-1 overflow-y-auto">{children}</main>
-            </div>
-          </div>
+          <AppFrame>{children}</AppFrame>
         </Providers>
       </body>
     </html>

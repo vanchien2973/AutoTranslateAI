@@ -50,6 +50,35 @@ public sealed class TikTokOAuthProvider : IOAuthProvider
         return new ChannelTokens(openId, displayName, accessToken, refreshToken, expiresAt);
     }
 
+    public async Task<ChannelTokens> RefreshAsync(
+        OAuthAppCredentials app,
+        string refreshToken,
+        CancellationToken cancellationToken)
+    {
+        var http = _httpClientFactory.CreateClient(nameof(TikTokOAuthProvider));
+
+        using var response = await http.PostAsync(TokenEndpoint, new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["client_key"] = app.ClientId,
+            ["client_secret"] = app.ClientSecret,
+            ["refresh_token"] = refreshToken,
+            ["grant_type"] = "refresh_token",
+        }), cancellationToken);
+        await PublishHttp.EnsureSuccessAsync(response, "TikTok token refresh", cancellationToken);
+
+        using var token = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        var root = token.RootElement;
+
+        return new ChannelTokens(
+            ChannelId: string.Empty,
+            ChannelName: string.Empty,
+            AccessToken: root.GetProperty("access_token").GetString()!,
+            RefreshToken: root.TryGetProperty("refresh_token", out var refresh) ? refresh.GetString() : null,
+            ExpiresAt: root.TryGetProperty("expires_in", out var expires)
+                ? DateTimeOffset.UtcNow.AddSeconds(expires.GetInt32())
+                : null);
+    }
+
     // Use the display name best-effort — if the scope user.info.basic is missing, skip it to avoid breaking the connection.
     private static async Task<string?> TryGetDisplayNameAsync(HttpClient http, string accessToken, CancellationToken cancellationToken)
     {

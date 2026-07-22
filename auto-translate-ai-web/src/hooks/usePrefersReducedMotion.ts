@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { useUiStore } from "@/store/uiStore";
 
 const QUERY = "(prefers-reduced-motion: reduce)";
 
@@ -11,9 +12,12 @@ function subscribe(callback: () => void) {
 }
 
 export function usePrefersReducedMotion() {
-  return useSyncExternalStore(
+  const forced = useUiStore((state) => state.forceReducedMotion);
+  const system = useSyncExternalStore(
     subscribe,
     () => window.matchMedia(QUERY).matches,
     () => false,
   );
+
+  return forced || system;
 }

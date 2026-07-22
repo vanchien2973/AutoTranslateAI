@@ -26,6 +26,7 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity, IVersioned
 
     private readonly List<Segment> _segments = new();
     private readonly List<JobStep> _steps = new();
+    private readonly List<JobPublishTarget> _autoPublishTargets = new();
 
     private DubbingJob()
     {
@@ -79,6 +80,11 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity, IVersioned
     public BgmMode BgmMode { get; private set; }
     public int DuckingDb { get; private set; }
     public SubtitleMode SubtitleMode { get; private set; }
+    public string? LogoStorageKey { get; private set; }
+    public LogoPosition LogoPosition { get; private set; } = LogoPosition.BottomRight;
+    public double LogoScalePercent { get; private set; } = 0.1;
+    public int LogoMargin { get; private set; } = 16;
+
     public JobStatus Status { get; private set; }
     public StepType? CurrentStep { get; private set; }
     public int ProgressPercent { get; private set; }
@@ -95,6 +101,8 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity, IVersioned
     public DateTimeOffset? CompletedAt { get; private set; }
     public IReadOnlyCollection<Segment> Segments => _segments.AsReadOnly();
     public IReadOnlyCollection<JobStep> Steps => _steps.AsReadOnly();
+
+    public IReadOnlyCollection<JobPublishTarget> AutoPublishTargets => _autoPublishTargets.AsReadOnly();
 
     // ---- State machine: each method is a valid transition ----
 
@@ -131,6 +139,8 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity, IVersioned
                 throw new InvalidStateTransitionException(nameof(DubbingJob), Status, JobStatus.ProcessingPhase1);
         }
 
+        // A retry after a failure re-enters here from Failed; the previous error no longer applies.
+        ErrorMessage = null;
         StartedAt ??= DateTimeOffset.UtcNow;
         CurrentStep = StepType.Download;
     }
@@ -170,6 +180,10 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity, IVersioned
             step.Reset();
         }
 
+        // Drop the auto-publish plan: platforms create a NEW video rather than updating the old one,
+        // so re-rendering must not silently post a duplicate. The user can publish again by hand.
+        _autoPublishTargets.Clear();
+
         OutputFilePath = null;
         CompletedAt = null;
         CurrentStep = null;
@@ -198,6 +212,8 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity, IVersioned
                 throw new InvalidStateTransitionException(nameof(DubbingJob), Status, JobStatus.ProcessingPhase2);
         }
 
+        // Clears any error left over from a failed Phase 2 that is now being retried.
+        ErrorMessage = null;
         CurrentStep = StepType.Tts;
     }
 
@@ -215,6 +231,8 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity, IVersioned
         OutputFilePath = outputFilePath;
         ProgressPercent = 100;
         CurrentStep = null;
+        // A completed job never carries an error, even if an earlier attempt failed.
+        ErrorMessage = null;
         CompletedAt = DateTimeOffset.UtcNow;
         Touch();
     }
@@ -248,6 +266,37 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity, IVersioned
     public void SetWorkspace(string workspacePath)
     {
         WorkspacePath = workspacePath;
+        Touch();
+    }
+
+    public void SetLogo(string storageKey, LogoPosition position, double scalePercent, int margin)
+    {
+        if (string.IsNullOrWhiteSpace(storageKey))
+        {
+            throw new BusinessRuleViolationException("Logo storage key must not be empty.");
+        }
+
+        if (scalePercent is <= 0 or > 1)
+        {
+            throw new BusinessRuleViolationException("Logo scale must be between 0 and 1 (fraction of video height).");
+        }
+
+        if (margin < 0)
+        {
+            throw new BusinessRuleViolationException("Logo margin must not be negative.");
+        }
+
+        LogoStorageKey = storageKey;
+        LogoPosition = position;
+        LogoScalePercent = scalePercent;
+        LogoMargin = margin;
+        Touch();
+    }
+
+    public void SetAutoPublishTargets(IEnumerable<JobPublishTarget> targets)
+    {
+        _autoPublishTargets.Clear();
+        _autoPublishTargets.AddRange(targets);
         Touch();
     }
 

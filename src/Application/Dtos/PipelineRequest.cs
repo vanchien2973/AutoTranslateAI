@@ -13,4 +13,8 @@ public sealed record PipelineRequest(
     SubtitleMode SubtitleMode = SubtitleMode.None,
     BgmMode BgmMode = BgmMode.DemucsAI,
     int DuckingDb = -12,
-    IReadOnlyList<PipelineSegment>? Segments = null);
+    IReadOnlyList<PipelineSegment>? Segments = null,
+    string? LogoStorageKey = null,
+    LogoPosition LogoPosition = LogoPosition.BottomRight,
+    double LogoScalePercent = 0.1,
+    int LogoMargin = 16);

@@ -44,6 +44,7 @@ export function useJobProgress(jobId: string): JobLiveState {
     hub.on("ReceiveProgress", (payload: JobProgress) => {
       setProgress(payload);
       queryClient.invalidateQueries({ queryKey: jobKeys.detail(jobId) });
+      queryClient.invalidateQueries({ queryKey: jobKeys.all });
     });
 
     hub.on("ReceiveMetrics", (payload: JobMetrics) => setMetrics(payload));

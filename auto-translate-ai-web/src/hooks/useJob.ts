@@ -1,10 +1,8 @@
 "use client";
-
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-
 import type { ConnectionState } from "@/hooks/useJobProgress";
 import { ApiError } from "@/lib/api/client";
-import { cancelJob, getJob, jobKeys } from "@/lib/api/jobs";
+import { cancelJob, confirmJob, getJob, jobKeys, reopenJob } from "@/lib/api/jobs";
 import { isActive, type JobDetail } from "@/types/job";
 
 export function useJob(id: string, connection: ConnectionState) {
@@ -25,9 +23,21 @@ function pollInterval(job: JobDetail | undefined, connection: ConnectionState) {
 }
 
 export function useCancelJob(id: string) {
+  return useJobTransition(id, cancelJob);
+}
+
+export function useConfirmJob(id: string) {
+  return useJobTransition(id, confirmJob);
+}
+
+export function useReopenJob(id: string) {
+  return useJobTransition(id, reopenJob);
+}
+
+function useJobTransition(id: string, transition: (id: string) => Promise<unknown>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => cancelJob(id),
+    mutationFn: () => transition(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: jobKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: jobKeys.all });

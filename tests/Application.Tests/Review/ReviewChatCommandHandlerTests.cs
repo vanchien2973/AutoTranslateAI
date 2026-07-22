@@ -7,7 +7,7 @@ namespace Application.Tests.Review;
 public class ReviewChatCommandHandlerTests
 {
     private const string ValidJson =
-        """{"message":"đã sửa","proposals":[{"segmentIndex":0,"target":"AudioText","proposedText":"bản mới","reason":"tự nhiên hơn"}]}""";
+        """{"message":"đã sửa","proposals":[{"segmentIndex":1,"target":"AudioText","proposedText":"bản mới","reason":"tự nhiên hơn"}]}""";
 
     private static Segment Seg(int index)
     {

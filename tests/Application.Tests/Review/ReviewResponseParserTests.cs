@@ -22,7 +22,8 @@ public class ReviewResponseParserTests
     {
         // Arrange
         var segments = Segments();
-        var json = """{"message":"ok","proposals":[{"segmentIndex":5,"target":"AudioText","proposedText":"bản mới","reason":"tự nhiên hơn"}]}""";
+        var json = // The model answers with the 1-based number it was shown; index 5 on the wire is segment 4.
+            """{"message":"ok","proposals":[{"segmentIndex":5,"target":"AudioText","proposedText":"bản mới","reason":"tự nhiên hơn"}]}""";
 
         // Act
         var success = ReviewResponseParser.TryParse(json, segments, out var message, out var proposals, out var error);
@@ -33,10 +34,10 @@ public class ReviewResponseParserTests
         message.Should().Be("ok");
         proposals.Should().ContainSingle();
         var proposal = proposals![0];
-        proposal.SegmentId.Should().Be(segments[5].Id);
-        proposal.SegmentIndex.Should().Be(5);
+        proposal.SegmentId.Should().Be(segments[4].Id);
+        proposal.SegmentIndex.Should().Be(4);
         proposal.Target.Should().Be(EditTarget.AudioText);
-        proposal.CurrentText.Should().Be(segments[5].TtsText);
+        proposal.CurrentText.Should().Be(segments[4].TtsText);
         proposal.ProposedText.Should().Be("bản mới");
         proposal.ProposalId.Should().NotBe(Guid.Empty);
     }

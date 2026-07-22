@@ -7,7 +7,6 @@ namespace Application.Features.Jobs.GetJobStatus;
 
 public sealed class GetJobStatusQueryHandler : IRequestHandler<GetJobStatusQuery, GetJobStatusResponse>
 {
-    private const int TotalPipelineSteps = 9;
     private static readonly TimeSpan DownloadUrlLifetime = TimeSpan.FromHours(1);
 
     private readonly IDubbingJobRepository _jobs;
@@ -27,10 +26,7 @@ public sealed class GetJobStatusQueryHandler : IRequestHandler<GetJobStatusQuery
             return GetJobStatusResponse.NotFound();
         }
 
-        var finished = job.Steps.Count(step => step.Status is JobStepStatus.Completed or JobStepStatus.Skipped);
-        var progress = job.Status == JobStatus.Completed
-            ? 100
-            : Math.Min(99, finished * 100 / TotalPipelineSteps);
+        var progress = JobProgressCalculator.Percent(job);
 
         // Prefer the step actually Running; fall back to the job's last-set step.
         var running = job.Steps.FirstOrDefault(step => step.Status == JobStepStatus.Running);
@@ -55,6 +51,9 @@ public sealed class GetJobStatusQueryHandler : IRequestHandler<GetJobStatusQuery
         var dto = new JobStatusDto(
             job.Id,
             job.Status.ToString(),
+            job.AudioLanguage,
+            job.SubtitleLanguage,
+            job.EnableDubbing,
             currentStep,
             progress,
             job.ErrorMessage,

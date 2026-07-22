@@ -24,6 +24,7 @@ public class ReviewPromptBuilderTests
         var prompt = ReviewPromptBuilder.BuildUserPrompt(new[] { segment }, Array.Empty<ChatMessage>(), "dịch câu 5");
 
         // Assert
-        prompt.Should().Contain("[5]").And.Contain("hello world").And.Contain("dịch câu 5");
+        // Segment 5 is shown as "[6]": the prompt numbers from 1 so it matches the review table.
+        prompt.Should().Contain("[6]").And.Contain("hello world").And.Contain("dịch câu 5");
     }
 }

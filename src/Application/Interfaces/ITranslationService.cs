@@ -7,4 +7,6 @@ public interface ITranslationService
         string sourceLang,
         string targetLang,
         CancellationToken cancellationToken);
+
+    IReadOnlyCollection<string> SupportedLanguages { get; }
 }

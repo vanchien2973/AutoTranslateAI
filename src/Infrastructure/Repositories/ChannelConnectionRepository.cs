@@ -21,6 +21,14 @@ public sealed class ChannelConnectionRepository : IChannelConnectionRepository
             .OrderByDescending(connection => connection.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public Task<ChannelConnection?> GetByChannelAsync(
+        PublishPlatform platform,
+        string channelId,
+        CancellationToken cancellationToken) =>
+        _dbContext.ChannelConnections.FirstOrDefaultAsync(
+            connection => connection.Platform == platform && connection.ChannelId == channelId,
+            cancellationToken);
+
     public async Task<IReadOnlyList<ChannelConnection>> ListAsync(CancellationToken cancellationToken) =>
         await _dbContext.ChannelConnections
             .AsNoTracking()

@@ -10,10 +10,14 @@ public class PublishExecutorTests
     private static PublishExecutor Build(
         IChannelConnectionRepository connections,
         IPublisherFactory publishers = null!,
-        IPublishResultRepository results = null!) =>
+        IPublishResultRepository results = null!,
+        IPlatformCredentialRepository credentials = null!,
+        IOAuthProviderFactory oauth = null!) =>
         new(connections,
             publishers ?? Substitute.For<IPublisherFactory>(),
-            results ?? Substitute.For<IPublishResultRepository>());
+            results ?? Substitute.For<IPublishResultRepository>(),
+            credentials ?? Substitute.For<IPlatformCredentialRepository>(),
+            oauth ?? Substitute.For<IOAuthProviderFactory>());
 
     private static PublishTarget YouTubeTarget => new(PublishPlatform.YouTube, null, "Title", null, null);
 

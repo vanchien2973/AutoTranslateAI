@@ -18,6 +18,7 @@ public sealed class DubbingJobRepository : IDubbingJobRepository
         _dbContext.DubbingJobs
             .Include(job => job.Segments)
             .Include(job => job.Steps)
+            .Include(job => job.AutoPublishTargets)
             .FirstOrDefaultAsync(job => job.Id == jobId, cancellationToken);
 
     public async Task AddAsync(DubbingJob job, CancellationToken cancellationToken)
@@ -36,7 +37,11 @@ public sealed class DubbingJobRepository : IDubbingJobRepository
     {
         var query = _dbContext.DubbingJobs.AsNoTracking().OrderByDescending(job => job.CreatedAt);
         var total = await query.CountAsync(cancellationToken);
-        var items = await query.Skip(skip).Take(take).ToListAsync(cancellationToken);
+        var items = await query
+            .Include(job => job.Steps)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(cancellationToken);
         return (items, total);
     }
 

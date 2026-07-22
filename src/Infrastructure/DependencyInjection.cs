@@ -119,6 +119,7 @@ public static class DependencyInjection
     private static IServiceCollection AddProviders(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddValidatedOptions<ProviderOptions>(configuration, ProviderOptions.SectionName);
+        services.AddSingleton<IProviderRegistry, ConfiguredProviderRegistry>();
         services.AddValidatedOptions<AzureSpeechOptions>(configuration, AzureSpeechOptions.SectionName);
         services.AddValidatedOptions<OpenAIOptions>(configuration, OpenAIOptions.SectionName);
         services.AddValidatedOptions<OllamaOptions>(configuration, OllamaOptions.SectionName);

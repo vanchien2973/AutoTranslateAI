@@ -31,6 +31,8 @@ public sealed class OpenAiTranslationService : ITranslationService
         _logger = logger;
     }
 
+    public IReadOnlyCollection<string> SupportedLanguages => TranslationLanguageCatalog.Languages;
+
     public async Task<IReadOnlyList<string>> TranslateBatchAsync(
         IReadOnlyList<string> texts,
         string sourceLang,

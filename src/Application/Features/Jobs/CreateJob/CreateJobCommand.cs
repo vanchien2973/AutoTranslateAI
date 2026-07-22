@@ -11,4 +11,9 @@ public sealed record CreateJobCommand(
     bool? EnableDubbing,
     VoiceGender? VoiceGender,
     SubtitleMode? SubtitleMode,
-    BgmMode? BgmMode) : IRequest<CreateJobResponse>;
+    BgmMode? BgmMode,
+    string? LogoStorageKey = null,
+    LogoPosition? LogoPosition = null,
+    double? LogoScalePercent = null,
+    int? LogoMargin = null,
+    IReadOnlyList<AutoPublishTargetInput>? AutoPublishTargets = null) : IRequest<CreateJobResponse>;

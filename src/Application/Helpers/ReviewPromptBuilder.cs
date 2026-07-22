@@ -15,9 +15,11 @@ public static class ReviewPromptBuilder
         return
             "You are a subtitle-review assistant. The user is reviewing a translation from " +
             $"{source} to {target}. Only SUGGEST edits — never decide for the user. " +
+            "Segments are numbered starting at 1; segment 1 is the first one. Use those same numbers " +
+            "in \"segmentIndex\" and whenever you mention a segment in \"message\". " +
             "Respond with ONLY a JSON object matching this schema, no markdown or prose outside the JSON:\n" +
             "{\"message\": \"<short explanation for the user>\", \"proposals\": [" +
-            "{\"segmentIndex\": <int>, \"target\": \"AudioText|SubtitleText\", " +
+            "{\"segmentIndex\": <int, 1-based>, \"target\": \"AudioText|SubtitleText\", " +
             "\"proposedText\": \"<edited text>\", \"reason\": \"<why>\"}]}";
     }
 
@@ -30,8 +32,9 @@ public static class ReviewPromptBuilder
         builder.AppendLine("Relevant segments:");
         foreach (var segment in relevant)
         {
+            // +1 so the numbering matches the review table; ReviewResponseParser converts it back.
             builder.AppendLine(
-                $"[{segment.SegmentIndex}] source: \"{segment.OriginalText}\" | " +
+                $"[{segment.SegmentIndex + 1}] source: \"{segment.OriginalText}\" | " +
                 $"audio: \"{segment.TtsText}\" | subtitle: \"{segment.SubtitleText}\"");
         }
 

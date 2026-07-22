@@ -9,7 +9,7 @@ public class DtoConstructionTests
     {
         var step = new JobStepDto("Tts", "Completed", 2, 1500, 0, null);
         var status = new JobStatusDto(
-            Guid.NewGuid(), "ProcessingPhase2", "Tts", 55, null, "out.mp4", "https://dl",
+            Guid.NewGuid(), "ProcessingPhase2", "vi", "vi", true, "Tts", 55, null, "out.mp4", "https://dl",
             SegmentCount: 3, EditedSegmentCount: 1,
             CreatedAt: DateTimeOffset.UtcNow, StartedAt: null, ReviewReadyAt: null,
             ConfirmedAt: null, CompletedAt: null, Steps: [step]);

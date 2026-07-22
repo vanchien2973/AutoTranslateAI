@@ -13,6 +13,18 @@ export function cancelJob(id: string) {
   return apiFetch<void>(`/api/jobs/${id}/cancel`, { method: "POST" });
 }
 
+export function confirmJob(id: string) {
+  return apiFetch<{ jobId: string; jobStatus: string }>(`/api/jobs/${id}/confirm`, {
+    method: "POST",
+  });
+}
+
+export function reopenJob(id: string) {
+  return apiFetch<{ jobId: string; jobStatus: string }>(`/api/jobs/${id}/reopen`, {
+    method: "POST",
+  });
+}
+
 export function createJob(input: CreateJobInput) {
   return apiFetch<{ jobId: string }>("/api/jobs", {
     method: "POST",
@@ -21,13 +33,8 @@ export function createJob(input: CreateJobInput) {
   });
 }
 
-export function listAudioLanguages() {
-  return apiFetch<string[]>("/api/voices/languages");
-}
-
 export const jobKeys = {
   all: ["jobs"] as const,
   list: (page: number, pageSize: number) => [...jobKeys.all, "list", page, pageSize] as const,
   detail: (id: string) => [...jobKeys.all, "detail", id] as const,
-  audioLanguages: ["voices", "languages"] as const,
 };

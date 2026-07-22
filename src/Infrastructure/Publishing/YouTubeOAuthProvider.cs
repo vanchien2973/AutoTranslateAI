@@ -56,4 +56,35 @@ public sealed class YouTubeOAuthProvider : IOAuthProvider
 
         return new ChannelTokens(channelId, channelName, accessToken, refreshToken, expiresAt);
     }
+
+    public async Task<ChannelTokens> RefreshAsync(
+        OAuthAppCredentials app,
+        string refreshToken,
+        CancellationToken cancellationToken)
+    {
+        var http = _httpClientFactory.CreateClient(nameof(YouTubeOAuthProvider));
+
+        using var response = await http.PostAsync(TokenEndpoint, new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["refresh_token"] = refreshToken,
+            ["client_id"] = app.ClientId,
+            ["client_secret"] = app.ClientSecret,
+            ["grant_type"] = "refresh_token",
+        }), cancellationToken);
+        await PublishHttp.EnsureSuccessAsync(response, "Google token refresh", cancellationToken);
+
+        using var token = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        var root = token.RootElement;
+
+        // Google does not return a new refresh_token on refresh; ChannelConnection.UpdateTokens keeps
+        // the existing one when this is null.
+        return new ChannelTokens(
+            ChannelId: string.Empty,
+            ChannelName: string.Empty,
+            AccessToken: root.GetProperty("access_token").GetString()!,
+            RefreshToken: root.TryGetProperty("refresh_token", out var refresh) ? refresh.GetString() : null,
+            ExpiresAt: root.TryGetProperty("expires_in", out var expires)
+                ? DateTimeOffset.UtcNow.AddSeconds(expires.GetInt32())
+                : null);
+    }
 }

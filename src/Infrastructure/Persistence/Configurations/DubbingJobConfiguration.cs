@@ -18,6 +18,8 @@ public sealed class DubbingJobConfiguration : IEntityTypeConfiguration<DubbingJo
         builder.Property(j => j.AudioLanguage).HasMaxLength(10).IsRequired();
         builder.Property(j => j.SubtitleLanguage).HasMaxLength(10);
 
+        builder.Property(j => j.LogoStorageKey).HasMaxLength(300);
+
         builder.HasIndex(j => j.Status);
 
         builder.HasMany(j => j.Segments)
@@ -28,6 +30,11 @@ public sealed class DubbingJobConfiguration : IEntityTypeConfiguration<DubbingJo
         builder.HasMany(j => j.Steps)
             .WithOne()
             .HasForeignKey(s => s.JobId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(j => j.AutoPublishTargets)
+            .WithOne()
+            .HasForeignKey(t => t.JobId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Navigation(j => j.Segments).UsePropertyAccessMode(PropertyAccessMode.Field);

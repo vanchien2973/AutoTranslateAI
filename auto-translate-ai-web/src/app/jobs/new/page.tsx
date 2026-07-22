@@ -1,16 +1,23 @@
 "use client";
-
 import { AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-
+import {
+  AutoPublishPicker,
+  toAutoPublishTargets,
+  type AutoPublishSelection,
+} from "@/components/jobs/AutoPublishPicker";
+import { LogoPicker, type LogoSelection } from "@/components/jobs/LogoPicker";
 import { Button } from "@/components/ui/Button";
 import { Choice } from "@/components/ui/Choice";
 import { Dropdown, type DropdownOption } from "@/components/ui/Dropdown";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Toggle } from "@/components/ui/Toggle";
-import { useAudioLanguages, useCreateJob } from "@/hooks/useCreateJob";
+import { useCreateJob } from "@/hooks/useCreateJob";
+import { useAudioLanguages, useTranslationLanguages, useVoices } from "@/hooks/useVoices";
+import { useTemplateStore } from "@/store/templateStore";
+import { useUiStore } from "@/store/uiStore";
 import {
   BgmMode,
   SubtitleMode,
@@ -19,8 +26,6 @@ import {
   type SubtitleModeValue,
   type VoiceGenderValue,
 } from "@/types/job";
-
-const FALLBACK_LANGUAGES = ["vi", "en"];
 
 const languageNames = new Intl.DisplayNames(["en"], { type: "language" });
 
@@ -34,44 +39,102 @@ function languageOptions(codes: string[]): DropdownOption[] {
 
 export default function NewJobPage() {
   const router = useRouter();
-  const { data: languages } = useAudioLanguages();
+  const { data: audioLanguages, isPending: audioLanguagesPending } = useAudioLanguages();
+  const { data: subtitleLanguages, isPending: subtitleLanguagesPending } =
+    useTranslationLanguages();
   const { mutate, isPending, error } = useCreateJob();
 
+  const jobDefaults = useUiStore((state) => state.jobDefaults);
+  const templates = useTemplateStore((state) => state.templates);
+  const saveTemplate = useTemplateStore((state) => state.save);
+
   const [sourceUrl, setSourceUrl] = useState("");
-  const [audioLanguage, setAudioLanguage] = useState("vi");
-  const [subtitleLanguage, setSubtitleLanguage] = useState("vi");
-  const [enableDubbing, setEnableDubbing] = useState(true);
+  const [audioLanguage, setAudioLanguage] = useState(jobDefaults.audioLanguage);
+  const [subtitleLanguage, setSubtitleLanguage] = useState(jobDefaults.subtitleLanguage);
+  const [enableDubbing, setEnableDubbing] = useState(jobDefaults.enableDubbing);
   const [voiceGender, setVoiceGender] = useState<VoiceGenderValue>(VoiceGender.Female);
   const [subtitleMode, setSubtitleMode] = useState<SubtitleModeValue>(SubtitleMode.Softsub);
   const [bgmMode, setBgmMode] = useState<BgmModeValue>(BgmMode.DemucsAI);
-  const [urlError, setUrlError] = useState<string | null>(null);
+  const [logo, setLogo] = useState<LogoSelection | null>(null);
+  const [autoPublish, setAutoPublish] = useState<AutoPublishSelection | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const { data: voices, isPending: voicesPending } = useVoices(audioLanguage, enableDubbing);
+  const selectedVoice = voices?.find((voice) => voice.gender === voiceGender);
 
-  const options = languageOptions(languages ?? FALLBACK_LANGUAGES);
-  const subtitlesOff = subtitleMode === SubtitleMode.None;
+  const audioOptions = languageOptions(audioLanguages ?? []);
+  const subtitleOptions = languageOptions(subtitleLanguages ?? []);
+  const subtitlesOn = subtitleMode !== SubtitleMode.None;
+  const doesNothing = !enableDubbing && !subtitlesOn;
+
+  function applyTemplate(id: string) {
+    const template = templates.find((item) => item.id === id);
+    if (!template) return;
+
+    setAudioLanguage(template.audioLanguage);
+    setSubtitleLanguage(template.subtitleLanguage);
+    setEnableDubbing(template.enableDubbing);
+    setVoiceGender(template.voiceGender);
+    setSubtitleMode(template.subtitleMode);
+    setBgmMode(template.bgmMode);
+  }
+
+  function onSaveTemplate() {
+    const name = window.prompt("Name this template");
+    if (!name?.trim()) return;
+
+    saveTemplate({
+      name: name.trim(),
+      audioLanguage,
+      subtitleLanguage,
+      enableDubbing,
+      voiceGender,
+      subtitleMode,
+      bgmMode,
+    });
+  }
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
 
     const trimmed = sourceUrl.trim();
     if (!trimmed) {
-      setUrlError("Paste the video URL you want dubbed.");
+      setFormError("Paste the video URL you want processed.");
       return;
     }
     if (!/^https?:\/\//i.test(trimmed)) {
-      setUrlError("The pipeline downloads the video over HTTP — the URL must start with http(s).");
+      setFormError("The pipeline downloads the video over HTTP — the URL must start with http(s).");
       return;
     }
-    setUrlError(null);
+    if (doesNothing) {
+      setFormError(
+        "Turn on dubbing or add a subtitle track — otherwise this job has nothing to do.",
+      );
+      return;
+    }
+    if (enableDubbing && audioLanguages && !audioLanguages.includes(audioLanguage)) {
+      setFormError(`No text-to-speech voice is available for ${audioLanguage}.`);
+      return;
+    }
+    if (subtitlesOn && subtitleLanguages && !subtitleLanguages.includes(subtitleLanguage)) {
+      setFormError(`Subtitles can't be translated into ${subtitleLanguage}.`);
+      return;
+    }
+    setFormError(null);
 
     mutate(
       {
         sourceUrl: trimmed,
-        audioLanguage,
-        subtitleLanguage: subtitlesOff ? undefined : subtitleLanguage,
+        audioLanguage: enableDubbing ? audioLanguage : undefined,
+        subtitleLanguage: subtitlesOn ? subtitleLanguage : undefined,
         enableDubbing,
-        voiceGender,
+        voiceGender: enableDubbing ? voiceGender : undefined,
         subtitleMode,
         bgmMode,
+        autoPublishTargets: toAutoPublishTargets(autoPublish),
+        logoStorageKey: logo?.storageKey,
+        logoPosition: logo?.position,
+        logoScalePercent: logo?.scalePercent,
+        logoMargin: logo?.margin,
       },
       { onSuccess: () => router.push("/") },
     );
@@ -86,18 +149,31 @@ export default function NewJobPage() {
       </p>
 
       <form onSubmit={onSubmit} className="space-y-5">
+        {templates.length > 0 && (
+          <Field
+            label="Start from a template"
+            hint="Fills the settings below; you can still change them."
+          >
+            <Dropdown
+              options={templates.map((template) => ({ value: template.id, label: template.name }))}
+              value={null}
+              placeholder="Choose a template…"
+              onChange={applyTemplate}
+            />
+          </Field>
+        )}
+
         <Field
           label="Video URL"
           htmlFor="sourceUrl"
-          error={urlError ?? undefined}
-          hint="YouTube or any URL yt-dlp can fetch. The source language is detected during transcription."
+          hint="YouTube or any URL yt-dlp can fetch. The spoken language is detected during transcription."
         >
           <Input
             id="sourceUrl"
             value={sourceUrl}
             onChange={(event) => setSourceUrl(event.target.value)}
             placeholder="https://www.youtube.com/watch?v=…"
-            invalid={Boolean(urlError)}
+            invalid={Boolean(formError) && !sourceUrl.trim()}
             autoFocus
           />
         </Field>
@@ -106,35 +182,51 @@ export default function NewJobPage() {
           checked={enableDubbing}
           onChange={setEnableDubbing}
           label="Dub the audio"
-          hint="Off keeps the original voice track and only adds subtitles."
+          hint="Off keeps the original voice track — only subtitles get translated."
         />
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field
-            label="Audio language"
-            hint={
-              enableDubbing
-                ? "Only languages the TTS provider can speak."
-                : "Used as the translation target for subtitles."
-            }
-          >
-            <Dropdown options={options} value={audioLanguage} onChange={setAudioLanguage} />
-          </Field>
-
-          {enableDubbing && (
-            <Field label="Voice">
-              <Choice
-                name="Voice gender"
-                value={voiceGender}
-                onChange={setVoiceGender}
-                options={[
-                  { value: VoiceGender.Female, label: "Female" },
-                  { value: VoiceGender.Male, label: "Male" },
-                ]}
+        {enableDubbing ? (
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field
+              label="Audio language"
+              hint={
+                audioLanguagesPending ? "Loading…" : "Only languages the TTS provider can speak."
+              }
+            >
+              <Dropdown
+                options={audioOptions}
+                value={audioLanguage}
+                onChange={setAudioLanguage}
+                disabled={audioLanguagesPending}
               />
             </Field>
-          )}
-        </div>
+
+            <Field
+              label="Voice"
+              hint={
+                voicesPending
+                  ? "Loading voices…"
+                  : (selectedVoice?.displayName ?? "No voice for this language.")
+              }
+            >
+              <Choice
+                name="Voice"
+                value={voiceGender}
+                onChange={setVoiceGender}
+                disabled={voicesPending || !voices?.length}
+                options={(voices ?? []).map((voice) => ({
+                  value: voice.gender,
+                  label: voice.gender === VoiceGender.Female ? "Female" : "Male",
+                  hint: voice.voiceId.split("-").pop(),
+                }))}
+              />
+            </Field>
+          </div>
+        ) : (
+          <p className="border-hairline bg-panel text-muted rounded-md border p-3 text-xs">
+            The original audio is kept as-is, so no voice or audio language is needed.
+          </p>
+        )}
 
         <Field label="Subtitles">
           <Choice
@@ -149,12 +241,17 @@ export default function NewJobPage() {
           />
         </Field>
 
-        {!subtitlesOff && (
+        {subtitlesOn && (
           <Field
             label="Subtitle language"
-            hint="Can differ from the spoken language — e.g. English audio with Vietnamese subs."
+            hint="Independent of the spoken language — e.g. keep English audio with Vietnamese subs."
           >
-            <Dropdown options={options} value={subtitleLanguage} onChange={setSubtitleLanguage} />
+            <Dropdown
+              options={subtitleOptions}
+              value={subtitleLanguage}
+              onChange={setSubtitleLanguage}
+              disabled={subtitleLanguagesPending}
+            />
           </Field>
         )}
 
@@ -174,16 +271,23 @@ export default function NewJobPage() {
           />
         </Field>
 
-        {error && (
+        <LogoPicker value={logo} onChange={setLogo} />
+
+        <AutoPublishPicker value={autoPublish} onChange={setAutoPublish} />
+
+        {(formError ?? error) && (
           <p className="border-red/30 bg-red/5 text-red flex items-start gap-2 rounded-md border p-3 text-sm">
             <AlertTriangle aria-hidden className="mt-0.5 size-4 shrink-0" />
-            {error.message}
+            {formError ?? error?.message}
           </p>
         )}
 
         <div className="flex items-center gap-3 pt-1">
-          <Button type="submit" disabled={isPending}>
+          <Button type="submit" disabled={isPending || doesNothing}>
             {isPending ? "Starting…" : "Start processing"}
+          </Button>
+          <Button type="button" variant="secondary" onClick={onSaveTemplate}>
+            Save as template
           </Button>
           <Button type="button" variant="ghost" onClick={() => router.push("/")}>
             Cancel

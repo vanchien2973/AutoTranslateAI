@@ -15,6 +15,10 @@ public sealed class PipelineContext
     public SubtitleMode SubtitleMode { get; init; } = SubtitleMode.None;
     public BgmMode BgmMode { get; init; } = BgmMode.DemucsAI;
     public int DuckingDb { get; init; } = -12;
+    public string? LogoStorageKey { get; init; }
+    public LogoPosition LogoPosition { get; init; } = LogoPosition.BottomRight;
+    public double LogoScalePercent { get; init; } = 0.1;
+    public int LogoMargin { get; init; } = 16;
     public string? SourceLanguage { get; set; }
     public string? SubtitlePath { get; set; }
     public List<PipelineSegment> Segments { get; } = [];

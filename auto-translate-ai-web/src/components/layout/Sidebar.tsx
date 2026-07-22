@@ -10,6 +10,7 @@ import {
   Plus,
   Settings2,
   SlidersHorizontal,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -17,7 +18,7 @@ import { usePathname } from "next/navigation";
 
 import { LevelMeter } from "@/components/layout/LevelMeter";
 import { SystemStatus } from "@/components/layout/SystemStatus";
-import { useJobs } from "@/hooks/useJobs";
+import { OVERVIEW_PAGE_SIZE, useJobs } from "@/hooks/useJobs";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/uiStore";
 import { isActive } from "@/types/job";
@@ -44,6 +45,7 @@ const NAV_GROUPS: { heading: string; items: NavItem[] }[] = [
     items: [
       { href: "/settings/providers", label: "Providers", icon: SlidersHorizontal },
       { href: "/settings/keys", label: "API keys", icon: KeyRound },
+      { href: "/settings/usage", label: "Usage & cost", icon: Wallet },
       { href: "/settings/preferences", label: "Preferences", icon: Settings2 },
     ],
   },
@@ -53,7 +55,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const open = useUiStore((state) => state.sidebarOpen);
   const toggleSidebar = useUiStore((state) => state.toggleSidebar);
-  const { data } = useJobs();
+  const { data } = useJobs(1, OVERVIEW_PAGE_SIZE);
   const onAir = data?.items.some((job) => isActive(job.status)) ?? false;
 
   return (

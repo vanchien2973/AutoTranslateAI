@@ -1,3 +1,4 @@
+using Application.Helpers;
 using Domain.Entities;
 
 namespace Application.Mappings;
@@ -9,7 +10,7 @@ public static class JobMapping
         job.Status.ToString(),
         job.SourceUrl,
         job.CurrentStep?.ToString(),
-        job.ProgressPercent,
+        JobProgressCalculator.Percent(job),
         job.ErrorMessage,
         job.CreatedAt,
         job.StartedAt,

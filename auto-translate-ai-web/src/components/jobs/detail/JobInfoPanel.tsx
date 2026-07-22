@@ -24,12 +24,18 @@ const timestamp = (iso: string | null) => (iso ? new Date(iso).toLocaleString() 
 export function JobInfoPanel({ job }: { job: JobDetail }) {
   return (
     <Panel bodyClassName="" className="text-sm">
+      <Section title="Output">
+        <Row label="Dubbing" value={job.enableDubbing ? "On" : "Off (original audio)"} />
+        <Row label="Audio" value={job.audioLanguage} />
+        <Row label="Subtitles" value={job.subtitleLanguage ?? "None"} />
+      </Section>
+
       <Section title="Review">
         <Row label="Segments" value={String(job.segmentCount)} />
         <Row label="Edited" value={String(job.editedSegmentCount)} />
       </Section>
 
-      <Section title="Output">
+      <Section title="Delivery">
         <Row label="Status" value={job.downloadUrl ? "Ready" : "Pending render"} />
         {job.downloadUrl && (
           <div className="pt-1">

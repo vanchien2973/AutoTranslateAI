@@ -38,6 +38,22 @@ public sealed class CreateJobCommandHandler : IRequestHandler<CreateJobCommand, 
             voiceGender: voiceGender,
             bgmMode: bgmMode,
             subtitleMode: subtitleMode);
+
+        if (!string.IsNullOrWhiteSpace(request.LogoStorageKey))
+        {
+            job.SetLogo(
+                request.LogoStorageKey,
+                request.LogoPosition ?? Domain.Enums.LogoPosition.BottomRight,
+                request.LogoScalePercent ?? 0.1,
+                request.LogoMargin ?? 16);
+        }
+
+        if (request.AutoPublishTargets is { Count: > 0 })
+        {
+            job.SetAutoPublishTargets(request.AutoPublishTargets.Select(target =>
+                new JobPublishTarget(job.Id, target.Platform, target.ConnectionId, target.Title, target.Description)));
+        }
+
         await _jobs.AddAsync(job, cancellationToken);
 
         await _events.PublishAsync(

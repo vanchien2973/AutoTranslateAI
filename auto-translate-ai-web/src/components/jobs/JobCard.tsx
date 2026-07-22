@@ -40,7 +40,7 @@ export function JobCard({ job }: { job: JobSummary }) {
         </div>
       </dl>
 
-      {job.errorMessage ? (
+      {job.status === "Failed" && job.errorMessage ? (
         <p className="text-red line-clamp-2 text-xs">{job.errorMessage}</p>
       ) : (
         <div className="space-y-1.5">

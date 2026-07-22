@@ -48,6 +48,29 @@ public sealed class R2StorageService : IStorageService, IDisposable
         return url;
     }
 
+    public async Task<string> UploadAsync(
+        Stream content,
+        string key,
+        string contentType,
+        CancellationToken cancellationToken)
+    {
+        var request = new PutObjectRequest
+        {
+            BucketName = _options.BucketName,
+            Key = key,
+            InputStream = content,
+            ContentType = contentType,
+            UseChunkEncoding = false,
+            DisablePayloadSigning = true,
+            DisableDefaultChecksumValidation = true,
+        };
+        await _s3.PutObjectAsync(request, cancellationToken);
+
+        var url = R2UrlResolver.Resolve(_options.PublicUrl, key);
+        _logger.LogInformation("Uploaded stream to R2 {Bucket}/{Key}", _options.BucketName, key);
+        return url;
+    }
+
     public async Task<string> GetPresignedUrlAsync(string key, TimeSpan expiry, CancellationToken cancellationToken)
     {
         var request = new GetPreSignedUrlRequest
