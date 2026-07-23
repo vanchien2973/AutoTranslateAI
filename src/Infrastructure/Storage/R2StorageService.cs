@@ -93,5 +93,41 @@ public sealed class R2StorageService : IStorageService, IDisposable
     public Task DeleteAsync(string key, CancellationToken cancellationToken) =>
         _s3.DeleteObjectAsync(_options.BucketName, key, cancellationToken);
 
+    public async Task<IReadOnlyList<string>> ListKeysAsync(string prefix, CancellationToken cancellationToken)
+    {
+        var keys = new List<string>();
+        string? continuationToken = null;
+        do
+        {
+            var response = await _s3.ListObjectsV2Async(
+                new ListObjectsV2Request
+                {
+                    BucketName = _options.BucketName,
+                    Prefix = string.IsNullOrEmpty(prefix) ? null : prefix,
+                    ContinuationToken = continuationToken,
+                },
+                cancellationToken);
+
+            keys.AddRange(response.S3Objects.Select(o => o.Key));
+            continuationToken = response.IsTruncated == true ? response.NextContinuationToken : null;
+        }
+        while (continuationToken is not null);
+
+        return keys;
+    }
+
+    public async Task<bool> ExistsAsync(string key, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _s3.GetObjectMetadataAsync(_options.BucketName, key, cancellationToken);
+            return true;
+        }
+        catch (AmazonS3Exception exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+    }
+
     public void Dispose() => _s3.Dispose();
 }

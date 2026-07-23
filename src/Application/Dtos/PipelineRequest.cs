@@ -17,4 +17,9 @@ public sealed record PipelineRequest(
     string? LogoStorageKey = null,
     LogoPosition LogoPosition = LogoPosition.BottomRight,
     double LogoScalePercent = 0.1,
-    int LogoMargin = 16);
+    int LogoMargin = 16,
+    string? SubtitleFontFamily = null,
+    int SubtitleFontSize = 24,
+    SubtitlePosition SubtitlePosition = SubtitlePosition.Bottom,
+    bool SubtitleBold = false,
+    bool SubtitleItalic = false);

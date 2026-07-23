@@ -2,6 +2,8 @@ using Domain.Entities;
 
 namespace Application.Interfaces;
 
+public sealed record JobStorageRef(Guid JobId, string? LogoStorageKey);
+
 public interface IDubbingJobRepository
 {
     Task<DubbingJob?> GetAsync(Guid jobId, CancellationToken cancellationToken);
@@ -15,6 +17,8 @@ public interface IDubbingJobRepository
     Task<IReadOnlyList<DubbingJob>> ListTerminalCreatedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<Guid>> ListActiveJobIdsAsync(CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<JobStorageRef>> ListActiveStorageRefsAsync(CancellationToken cancellationToken);
 
     Task<int> DeleteAsync(IReadOnlyList<Guid> jobIds, CancellationToken cancellationToken);
 }

@@ -84,6 +84,12 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity, IVersioned
     public LogoPosition LogoPosition { get; private set; } = LogoPosition.BottomRight;
     public double LogoScalePercent { get; private set; } = 0.1;
     public int LogoMargin { get; private set; } = 16;
+    public string? SubtitleFontFamily { get; private set; }
+    public int SubtitleFontSize { get; private set; } = 24;
+    public SubtitlePosition SubtitlePosition { get; private set; } = SubtitlePosition.Bottom;
+    public bool SubtitleBold { get; private set; }
+    public bool SubtitleItalic { get; private set; }
+    public string? SourceMediaFileName { get; private set; }
 
     public JobStatus Status { get; private set; }
     public StepType? CurrentStep { get; private set; }
@@ -290,6 +296,38 @@ public sealed class DubbingJob : BaseEntity, IAuditableEntity, IVersioned
         LogoPosition = position;
         LogoScalePercent = scalePercent;
         LogoMargin = margin;
+        Touch();
+    }
+
+    public const int MinSubtitleFontSize = 8;
+    public const int MaxSubtitleFontSize = 120;
+
+    /// <summary>Set hardsub styling (font/size/position/weight). Only affects burned-in subtitles.</summary>
+    public void SetSubtitleStyle(string? fontFamily, int fontSize, SubtitlePosition position, bool bold, bool italic)
+    {
+        if (fontSize is < MinSubtitleFontSize or > MaxSubtitleFontSize)
+        {
+            throw new BusinessRuleViolationException(
+                $"Subtitle font size must be between {MinSubtitleFontSize} and {MaxSubtitleFontSize}.");
+        }
+
+        SubtitleFontFamily = string.IsNullOrWhiteSpace(fontFamily) ? null : fontFamily.Trim();
+        SubtitleFontSize = fontSize;
+        SubtitlePosition = position;
+        SubtitleBold = bold;
+        SubtitleItalic = italic;
+        Touch();
+    }
+
+    /// <summary>Record the downloaded source file name (set by Phase 1 after the Download step).</summary>
+    public void SetSourceMedia(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            throw new BusinessRuleViolationException("Source media file name must not be empty.");
+        }
+
+        SourceMediaFileName = Path.GetFileName(fileName);
         Touch();
     }
 

@@ -70,6 +70,12 @@ public sealed class Phase1Consumer : IConsumer<DubbingJobRequested>
             // Persist the transcript/translation so the user can review and edit it via the API.
             job.SetSegments(result.Segments.Select(segment => SegmentMapping.ToDomain(job.Id, segment)));
 
+            // Remember the downloaded file name so the API can stream the video into the review preview.
+            if (!string.IsNullOrWhiteSpace(result.SourceVideoPath))
+            {
+                job.SetSourceMedia(result.SourceVideoPath);
+            }
+
             // Pause: set AwaitingReview and publish NOTHING. The user edits segments then POSTs /confirm.
             job.MarkAwaitingReview();
             await _jobs.SaveChangesAsync(cancellationToken);

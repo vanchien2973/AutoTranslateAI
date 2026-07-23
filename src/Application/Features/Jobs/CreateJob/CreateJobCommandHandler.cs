@@ -48,6 +48,20 @@ public sealed class CreateJobCommandHandler : IRequestHandler<CreateJobCommand, 
                 request.LogoMargin ?? 16);
         }
 
+        if (request.SubtitleFontFamily is not null
+            || request.SubtitleFontSize.HasValue
+            || request.SubtitlePosition.HasValue
+            || request.SubtitleBold.HasValue
+            || request.SubtitleItalic.HasValue)
+        {
+            job.SetSubtitleStyle(
+                request.SubtitleFontFamily,
+                request.SubtitleFontSize ?? 24,
+                request.SubtitlePosition ?? Domain.Enums.SubtitlePosition.Bottom,
+                request.SubtitleBold ?? false,
+                request.SubtitleItalic ?? false);
+        }
+
         if (request.AutoPublishTargets is { Count: > 0 })
         {
             job.SetAutoPublishTargets(request.AutoPublishTargets.Select(target =>

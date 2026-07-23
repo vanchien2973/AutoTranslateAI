@@ -19,6 +19,11 @@ public sealed class PipelineContext
     public LogoPosition LogoPosition { get; init; } = LogoPosition.BottomRight;
     public double LogoScalePercent { get; init; } = 0.1;
     public int LogoMargin { get; init; } = 16;
+    public string? SubtitleFontFamily { get; init; }
+    public int SubtitleFontSize { get; init; } = 24;
+    public SubtitlePosition SubtitlePosition { get; init; } = SubtitlePosition.Bottom;
+    public bool SubtitleBold { get; init; }
+    public bool SubtitleItalic { get; init; }
     public string? SourceLanguage { get; set; }
     public string? SubtitlePath { get; set; }
     public List<PipelineSegment> Segments { get; } = [];

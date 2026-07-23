@@ -11,4 +11,8 @@ public interface IStorageService
     Task<Stream> DownloadAsync(string key, CancellationToken cancellationToken);
 
     Task DeleteAsync(string key, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<string>> ListKeysAsync(string prefix, CancellationToken cancellationToken);
+
+    Task<bool> ExistsAsync(string key, CancellationToken cancellationToken);
 }

@@ -65,6 +65,15 @@ public sealed class DubbingJobRepository : IDubbingJobRepository
             .Select(job => job.Id)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<JobStorageRef>> ListActiveStorageRefsAsync(CancellationToken cancellationToken) =>
+        await _dbContext.DubbingJobs
+            .AsNoTracking()
+            .Where(job => job.Status != JobStatus.Completed
+                && job.Status != JobStatus.Failed
+                && job.Status != JobStatus.Cancelled)
+            .Select(job => new JobStorageRef(job.Id, job.LogoStorageKey))
+            .ToListAsync(cancellationToken);
+
     public Task<int> DeleteAsync(IReadOnlyList<Guid> jobIds, CancellationToken cancellationToken) =>
         _dbContext.DubbingJobs.Where(job => jobIds.Contains(job.Id)).ExecuteDeleteAsync(cancellationToken);
 }

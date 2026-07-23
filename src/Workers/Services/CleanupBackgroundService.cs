@@ -76,6 +76,10 @@ public sealed class CleanupBackgroundService : BackgroundService
         var retention = terminal.Select(job => new JobRetentionInfo(job.Id, job.CompletedAt ?? job.UpdatedAt ?? job.CreatedAt));
         var expired = RetentionPolicy.ExpiredJobs(retention, now, _options.JobRetentionDays);
 
+        var logoByJob = terminal
+            .Where(job => !string.IsNullOrWhiteSpace(job.LogoStorageKey))
+            .ToDictionary(job => job.Id, job => job.LogoStorageKey!);
+
         foreach (var jobId in expired)
         {
             workspace.Cleanup(jobId);
@@ -86,6 +90,18 @@ public sealed class CleanupBackgroundService : BackgroundService
             catch (Exception exception)
             {
                 _logger.LogWarning(exception, "Failed to delete output object for job {JobId}", jobId);
+            }
+
+            if (logoByJob.TryGetValue(jobId, out var logoKey))
+            {
+                try
+                {
+                    await storage.DeleteAsync(logoKey, cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogWarning(exception, "Failed to delete logo object for job {JobId}", jobId);
+                }
             }
         }
 

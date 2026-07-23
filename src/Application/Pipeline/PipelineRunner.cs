@@ -46,6 +46,11 @@ public sealed class PipelineRunner
             LogoPosition = request.LogoPosition,
             LogoScalePercent = request.LogoScalePercent,
             LogoMargin = request.LogoMargin,
+            SubtitleFontFamily = request.SubtitleFontFamily,
+            SubtitleFontSize = request.SubtitleFontSize,
+            SubtitlePosition = request.SubtitlePosition,
+            SubtitleBold = request.SubtitleBold,
+            SubtitleItalic = request.SubtitleItalic,
         };
 
         // Resume: rehydrate artifacts/segments from the last snapshot and learn which steps already finished.

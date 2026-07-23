@@ -182,7 +182,7 @@ public class RenderStepTests
     [Fact]
     public async Task Given_NoSourceVideo_When_Execute_Then_Fails()
     {
-        var step = new RenderStep(Substitute.For<IVideoRenderer>(), StepFixture.Workspace(), Substitute.For<IStorageService>());
+        var step = new RenderStep(Substitute.For<IVideoRenderer>(), StepFixture.Workspace(), Substitute.For<IStorageService>(), NullLogger<RenderStep>.Instance);
 
         var result = await step.ExecuteAsync(StepFixture.Context(), CancellationToken.None);
 
@@ -195,7 +195,7 @@ public class RenderStepTests
         var context = StepFixture.Context(enableDubbing: true);
         context.SourceVideoPath = "/ws/video.mp4";
 
-        var result = await new RenderStep(Substitute.For<IVideoRenderer>(), StepFixture.Workspace(), Substitute.For<IStorageService>())
+        var result = await new RenderStep(Substitute.For<IVideoRenderer>(), StepFixture.Workspace(), Substitute.For<IStorageService>(), NullLogger<RenderStep>.Instance)
             .ExecuteAsync(context, CancellationToken.None);
 
         result.IsFailed.Should().BeTrue();
@@ -210,7 +210,7 @@ public class RenderStepTests
         context.SourceVideoPath = "/ws/video.mp4";
         context.DubbedVocalsPath = "/ws/dubbed_vocals.wav";
 
-        var result = await new RenderStep(renderer, StepFixture.Workspace(), Substitute.For<IStorageService>()).ExecuteAsync(context, CancellationToken.None);
+        var result = await new RenderStep(renderer, StepFixture.Workspace(), Substitute.For<IStorageService>(), NullLogger<RenderStep>.Instance).ExecuteAsync(context, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         context.OutputVideoPath.Should().Be("/ws/output.mp4");

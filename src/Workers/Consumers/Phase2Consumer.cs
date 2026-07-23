@@ -80,7 +80,12 @@ public sealed class Phase2Consumer : IConsumer<DubbingJobConfirmed>
                 job.LogoStorageKey,
                 job.LogoPosition,
                 job.LogoScalePercent,
-                job.LogoMargin);
+                job.LogoMargin,
+                job.SubtitleFontFamily,
+                job.SubtitleFontSize,
+                job.SubtitlePosition,
+                job.SubtitleBold,
+                job.SubtitleItalic);
 
             var result = await _metrics.TrackAsync(
                 job.Id, ct => _runner.RunAsync(request, PipelinePhase.Phase2, ct), cancellationToken);

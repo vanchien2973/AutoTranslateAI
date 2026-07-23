@@ -16,4 +16,9 @@ public sealed record CreateJobCommand(
     LogoPosition? LogoPosition = null,
     double? LogoScalePercent = null,
     int? LogoMargin = null,
+    string? SubtitleFontFamily = null,
+    int? SubtitleFontSize = null,
+    SubtitlePosition? SubtitlePosition = null,
+    bool? SubtitleBold = null,
+    bool? SubtitleItalic = null,
     IReadOnlyList<AutoPublishTargetInput>? AutoPublishTargets = null) : IRequest<CreateJobResponse>;

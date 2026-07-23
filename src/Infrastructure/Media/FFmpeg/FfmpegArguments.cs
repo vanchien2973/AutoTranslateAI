@@ -171,12 +171,35 @@ internal static class FfmpegArguments
 
         if (hardsub)
         {
-            filter.Append(CultureInfo.InvariantCulture, $"{(hasLogo ? "," : string.Empty)}subtitles={EscapeSubtitlePath(request.SubtitlePath!)}");
+            filter.Append(CultureInfo.InvariantCulture,
+                $"{(hasLogo ? "," : string.Empty)}subtitles={EscapeSubtitlePath(request.SubtitlePath!)}:force_style='{BuildForceStyle(request)}'");
         }
 
         filter.Append("[v]");
         return filter.ToString();
     }
+
+    private static string BuildForceStyle(RenderRequest request)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(request.SubtitleFontFamily))
+        {
+            parts.Add($"FontName={request.SubtitleFontFamily}");
+        }
+
+        parts.Add($"FontSize={request.SubtitleFontSize.ToString(CultureInfo.InvariantCulture)}");
+        parts.Add($"Bold={(request.SubtitleBold ? -1 : 0)}");
+        parts.Add($"Italic={(request.SubtitleItalic ? -1 : 0)}");
+        parts.Add($"Alignment={SubtitleAlignment(request.SubtitlePosition)}");
+        return string.Join(",", parts);
+    }
+
+    private static int SubtitleAlignment(SubtitlePosition position) => position switch
+    {
+        SubtitlePosition.Top => 8,
+        SubtitlePosition.Middle => 5,
+        _ => 2,
+    };
 
     private static string OverlayXy(LogoPosition position, int margin) => position switch
     {

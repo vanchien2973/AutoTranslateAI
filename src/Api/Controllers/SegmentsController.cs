@@ -2,6 +2,7 @@ using Application.Enums;
 using Application.Features.Segments.AdjustSegmentTiming;
 using Application.Features.Segments.BulkUpdateSegments;
 using Application.Features.Segments.GetSegments;
+using Application.Features.Segments.GetVoicePreview;
 using Application.Features.Segments.UpdateSegment;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -41,6 +42,18 @@ public sealed class SegmentsController : ControllerBase
             OperationStatus.NotFound => NotFound(),
             OperationStatus.Conflict => Conflict(response.Error),
             _ => StatusCode(StatusCodes.Status500InternalServerError),
+        };
+    }
+
+    [HttpGet("{segmentId:guid}/voice-preview")]
+    public async Task<IActionResult> VoicePreview(Guid jobId, Guid segmentId, CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(new GetVoicePreviewQuery(jobId, segmentId), cancellationToken);
+        return response.Status switch
+        {
+            OperationStatus.Ok => File(response.Audio!, response.ContentType!),
+            OperationStatus.Conflict => Conflict(),
+            _ => NotFound(),
         };
     }
 

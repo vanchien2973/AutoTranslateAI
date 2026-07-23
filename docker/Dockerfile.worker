@@ -31,6 +31,10 @@ RUN apt-get update \
         python3-pip \
         python3-venv \
         ca-certificates \
+        fontconfig \
+        fonts-noto-core \
+        fonts-noto-cjk \
+        fonts-dejavu \
  && rm -rf /var/lib/apt/lists/*
 
 # Python tools live in an isolated venv (Debian bookworm is PEP-668 "externally managed").

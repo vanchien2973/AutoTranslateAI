@@ -1,7 +1,6 @@
-using Application.Dtos;
 using Application.Interfaces;
-using Application.Pipeline;
 using Domain.Enums;
+using Microsoft.Extensions.Logging;
 
 namespace Workers.Steps;
 
@@ -12,12 +11,18 @@ public sealed class RenderStep : IPipelineStep
     private readonly IVideoRenderer _renderer;
     private readonly IWorkspaceManager _workspace;
     private readonly IStorageService _storage;
+    private readonly ILogger<RenderStep> _logger;
 
-    public RenderStep(IVideoRenderer renderer, IWorkspaceManager workspace, IStorageService storage)
+    public RenderStep(
+        IVideoRenderer renderer,
+        IWorkspaceManager workspace,
+        IStorageService storage,
+        ILogger<RenderStep> logger)
     {
         _renderer = renderer;
         _workspace = workspace;
         _storage = storage;
+        _logger = logger;
     }
 
     public StepType StepType => StepType.Render;
@@ -35,9 +40,20 @@ public sealed class RenderStep : IPipelineStep
             return StepResult.Fail("Dubbing is enabled but no dubbed audio track was produced.");
         }
 
-        var logoUrl = string.IsNullOrWhiteSpace(context.LogoStorageKey)
-            ? null
-            : await _storage.GetPresignedUrlAsync(context.LogoStorageKey, LogoUrlLifetime, cancellationToken);
+        string? logoUrl = null;
+        if (!string.IsNullOrWhiteSpace(context.LogoStorageKey))
+        {
+            if (await _storage.ExistsAsync(context.LogoStorageKey, cancellationToken))
+            {
+                logoUrl = await _storage.GetPresignedUrlAsync(context.LogoStorageKey, LogoUrlLifetime, cancellationToken);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Job {JobId}: logo object {Key} no longer exists (purged); rendering without watermark.",
+                    context.JobId, context.LogoStorageKey);
+            }
+        }
 
         var outputPath = _workspace.GetArtifactPath(context.JobId, "output.mp4");
         context.OutputVideoPath = await _renderer.RenderAsync(
@@ -50,7 +66,12 @@ public sealed class RenderStep : IPipelineStep
                 logoUrl,
                 context.LogoPosition,
                 context.LogoScalePercent,
-                context.LogoMargin),
+                context.LogoMargin,
+                context.SubtitleFontFamily,
+                context.SubtitleFontSize,
+                context.SubtitlePosition,
+                context.SubtitleBold,
+                context.SubtitleItalic),
             cancellationToken);
 
         return StepResult.Success();

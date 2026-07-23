@@ -19,6 +19,8 @@ public sealed class DubbingJobConfiguration : IEntityTypeConfiguration<DubbingJo
         builder.Property(j => j.SubtitleLanguage).HasMaxLength(10);
 
         builder.Property(j => j.LogoStorageKey).HasMaxLength(300);
+        builder.Property(j => j.SubtitleFontFamily).HasMaxLength(100);
+        builder.Property(j => j.SourceMediaFileName).HasMaxLength(260);
 
         builder.HasIndex(j => j.Status);
 

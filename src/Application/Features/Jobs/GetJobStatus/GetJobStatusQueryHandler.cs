@@ -66,7 +66,13 @@ public sealed class GetJobStatusQueryHandler : IRequestHandler<GetJobStatusQuery
             job.ReviewReadyAt,
             job.ConfirmedAt,
             job.CompletedAt,
-            steps);
+            steps,
+            job.SubtitleMode,
+            job.SubtitleFontFamily,
+            job.SubtitleFontSize,
+            job.SubtitlePosition,
+            job.SubtitleBold,
+            job.SubtitleItalic);
 
         return GetJobStatusResponse.Ok(dto);
     }

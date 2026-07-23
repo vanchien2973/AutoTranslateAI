@@ -4,7 +4,9 @@ using Application.Features.Jobs.CreateJob;
 using Application.Features.Jobs.GetJobDownload;
 using Application.Features.Jobs.GetJobs;
 using Application.Features.Jobs.GetJobStatus;
+using Application.Features.Jobs.GetJobSource;
 using Application.Features.Jobs.ReopenJob;
+using Application.Features.Jobs.UpdateSubtitleStyle;
 using Application.Features.Publishing.GenerateSeoMetadata;
 using Application.Features.Publishing.GetPublishResults;
 using Application.Features.Publishing.PublishJob;
@@ -77,6 +79,31 @@ public sealed class JobsController : ControllerBase
     {
         var response = await _mediator.Send(command, cancellationToken);
         return Accepted(new { jobId = response.JobId });
+    }
+
+    [HttpGet("{id:guid}/source")]
+    public async Task<IActionResult> Source(Guid id, CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(new GetJobSourceQuery(id), cancellationToken);
+        return response.Status == OperationStatus.Ok
+            ? PhysicalFile(response.FilePath!, response.ContentType!, enableRangeProcessing: true)
+            : NotFound();
+    }
+
+    [HttpPut("{id:guid}/subtitle-style")]
+    public async Task<IActionResult> UpdateSubtitleStyle(
+        Guid id,
+        [FromBody] UpdateSubtitleStyleCommand command,
+        CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(command with { JobId = id }, cancellationToken);
+        return response.Status switch
+        {
+            OperationStatus.Ok => NoContent(),
+            OperationStatus.NotFound => NotFound(),
+            OperationStatus.Conflict => Conflict(response.Error),
+            _ => StatusCode(StatusCodes.Status500InternalServerError),
+        };
     }
 
     [HttpGet("{id:guid}/download")]

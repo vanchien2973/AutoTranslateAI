@@ -12,7 +12,9 @@ public class DtoConstructionTests
             Guid.NewGuid(), "ProcessingPhase2", "vi", "vi", true, "Tts", 55, null, "out.mp4", "https://dl",
             SegmentCount: 3, EditedSegmentCount: 1,
             CreatedAt: DateTimeOffset.UtcNow, StartedAt: null, ReviewReadyAt: null,
-            ConfirmedAt: null, CompletedAt: null, Steps: [step]);
+            ConfirmedAt: null, CompletedAt: null, Steps: [step],
+            SubtitleMode: SubtitleMode.Hardsub, SubtitleFontFamily: "Noto Sans", SubtitleFontSize: 28,
+            SubtitlePosition: SubtitlePosition.Bottom, SubtitleBold: true, SubtitleItalic: false);
 
         status.Status.Should().Be("ProcessingPhase2");
         status.ProgressPercent.Should().Be(55);

@@ -25,6 +25,12 @@ public sealed class CreateJobCommandValidator : AbstractValidator<CreateJobComma
             .When(command => command.LogoMargin.HasValue)
             .WithMessage("Logo margin must not be negative.");
 
+        RuleFor(command => command.SubtitleFontSize!.Value)
+            .InclusiveBetween(DubbingJob.MinSubtitleFontSize, DubbingJob.MaxSubtitleFontSize)
+            .When(command => command.SubtitleFontSize.HasValue)
+            .WithMessage(
+                $"Subtitle font size must be between {DubbingJob.MinSubtitleFontSize} and {DubbingJob.MaxSubtitleFontSize}.");
+
         RuleForEach(command => command.AutoPublishTargets!)
             .ChildRules(target =>
             {

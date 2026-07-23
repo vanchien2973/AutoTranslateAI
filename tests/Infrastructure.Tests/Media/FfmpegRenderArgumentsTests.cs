@@ -105,6 +105,36 @@ public class FfmpegRenderArgumentsTests
         args.Should().ContainInOrder("-c:a", "copy"); // source audio kept as-is
     }
 
+    [Fact]
+    public void Given_HardsubStyle_When_BuildRender_Then_AppendsForceStyleWithMappedFields()
+    {
+        var args = FfmpegArguments.BuildRender(new RenderRequest(
+            "v.mp4", "a.wav", "o.mp4", SubtitleMode.Hardsub, "sub.srt",
+            SubtitleFontFamily: "Noto Sans", SubtitleFontSize: 30,
+            SubtitlePosition: SubtitlePosition.Top, SubtitleBold: true, SubtitleItalic: false));
+
+        var filter = Filter(args);
+        // libass style string: bold uses -1, Top maps to alignment 8, font/size verbatim.
+        filter.Should().Contain("force_style='");
+        filter.Should().Contain("FontName=Noto Sans");
+        filter.Should().Contain("FontSize=30");
+        filter.Should().Contain("Bold=-1");
+        filter.Should().Contain("Italic=0");
+        filter.Should().Contain("Alignment=8");
+    }
+
+    [Fact]
+    public void Given_HardsubDefaults_When_BuildRender_Then_ForceStyleOmitsFontAndUsesBottomAlignment()
+    {
+        var args = FfmpegArguments.BuildRender(new RenderRequest(
+            "v.mp4", "a.wav", "o.mp4", SubtitleMode.Hardsub, "sub.srt"));
+
+        var filter = Filter(args);
+        filter.Should().NotContain("FontName=");   // null font family is left to the libass default
+        filter.Should().Contain("Alignment=2");    // Bottom
+        filter.Should().Contain("Bold=0");
+    }
+
     private static string Filter(IReadOnlyList<string> args)
     {
         var list = args.ToList();

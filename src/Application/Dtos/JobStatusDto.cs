@@ -1,3 +1,5 @@
+using Domain.Enums;
+
 namespace Application.Dtos;
 
 public sealed record JobStatusDto(
@@ -18,4 +20,10 @@ public sealed record JobStatusDto(
     DateTimeOffset? ReviewReadyAt,
     DateTimeOffset? ConfirmedAt,
     DateTimeOffset? CompletedAt,
-    IReadOnlyList<JobStepDto> Steps);
+    IReadOnlyList<JobStepDto> Steps,
+    SubtitleMode SubtitleMode,
+    string? SubtitleFontFamily,
+    int SubtitleFontSize,
+    SubtitlePosition SubtitlePosition,
+    bool SubtitleBold,
+    bool SubtitleItalic);
